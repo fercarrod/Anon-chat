@@ -1,0 +1,38 @@
+.chatContainer{
+  padding: 30px;
+  width: 100%;
+  height: max-content;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 70px;
+  background-color: gainsboro;
+}
+.local{
+  padding: 20px;
+  border-radius: 20px;
+  background-color: green;
+  max-width: 80%;
+  color: whitesmoke;
+  font-size: 14px;
+  align-self: flex-start;
+}
+.remoto{
+  padding: 20px;
+  border-radius: 20px;
+  background-color: grey;
+  max-width: 80%;
+  color: whitesmoke;
+  font-size: 14px;
+  align-self: flex-end;
+}
+.inputContainer{
+  background-color: whitesmoke;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  padding: 10px;
+}
+input{
+  width: 100%;
+}
