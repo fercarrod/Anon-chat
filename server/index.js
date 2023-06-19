@@ -98,6 +98,14 @@ io.on('connection', (socket) => {
             }
           });
     })
+    socket.on('blindSign', (bmString) => {
+      console.log('bm recibido: ',bmString)
+      const blindedMessage = BigInt(bmString);
+      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      const blindSignature = llave.blindSign(blindedMessage)
+      console.log('blindSignature: ',blindSignature)
+      socket.emit('Signature', blindSignature.toString());
+    })
     //evento recibir mensaje y hacer broadcast a todos los clientes
     socket.on('sendMessage', (message) => {
         console.log('Mensaje enviado por el cliente:', message);

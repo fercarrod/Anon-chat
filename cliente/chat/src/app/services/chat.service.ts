@@ -43,7 +43,7 @@ export class ChatService {
     })
   }
   //evento para recibir los mensajes del server
-  publicKey = new RsaPubKey(
+  publicKey = new RsaPubKey(//llave publica del servidor
     65537n,
     140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
   );
@@ -60,5 +60,15 @@ export class ChatService {
   }
   getChats(): { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] {
     return this.chatsLocal;
+  }
+   blindSign(bmString:string,r:bigint) {
+    this.socket.io.emit('blindSign', bmString);
+    this.socket.io.on('Signature', (Signature)=>{
+      console.log('Signature: ',Signature)
+      const SignatureBigint = BigInt(Signature)
+      const llave = new RsaPubKey(this.publicKey.e,this.publicKey.n)
+      const unblind = llave.unblindSign(r,SignatureBigint)
+      console.log('unblind:',unblind)
+    })
   }
 }

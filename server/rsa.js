@@ -1,6 +1,11 @@
 const bcu = require('bigint-crypto-utils');
-
+// info de que contienen las llaves BlindSignature.pdf transparencia 10
+// Kpub=(e,n)  e=exponente público n=módulo público
+// Kpriv=(d,n) d=exponente privado n=módulo público
 class RsaPubKey {
+  // la clave publica puede encryptar o verificar
+  // encrypt recibe mensaje m
+  // verifica una firma(sign) s
   constructor(e, n) {
     this.e = e;
     this.n = n;
@@ -26,6 +31,8 @@ class RsaPubKey {
 }
 
 class RsaPrivKey {
+  // la clave privada puede desencryptar y firmar
+  // frima el mensaje m
   constructor(d, n) {
     this.d = d;
     this.n = n;
@@ -52,6 +59,8 @@ class RsaKeyPair {
 }
 
 const generateKeys = async function (bitLength) {
+  // para generar llaves, se tienen que generar 2 primos muy grandes
+// info BlindSignature.pdf transparencia 10,11,12,13
   const e = 65537n;
   let p, q, n, phi;
   do {

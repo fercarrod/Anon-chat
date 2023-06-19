@@ -1,18 +1,14 @@
 <p>chat works!</p>
-<button (click)="login()">login </button>
+<button (click)="login()">login</button>
+<button (click)="blindSign()">Firma Ciega</button>
 <div class="chatContainer">
-<p class="local" *ngFor="let chat of chat.chatsLocal">
-  {{ chat.messagesinEncriptar }}</p>
-<p class="remoto" *ngFor="let chat of chat.chatsServer">
-{{ chat }}</p>
-
-
-
-
+  <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat.messagesinEncriptar }}</p>
+  <p class="remoto" *ngFor="let chat of chat.chatsServer">{{ chat }}</p>
 </div>
 
 <div class="inputContainer" *ngIf="isLoggedIn">
   <input [(ngModel)]="text" [ngModelOptions]="{standalone:true}" type="text">
   <button (click)="sendMessage()" [disabled]="!isLoggedIn">Enviar</button>
 </div>
+
 

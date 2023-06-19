@@ -3,6 +3,9 @@ import { ChatService } from 'src/app/services/chat.service';
 import { RsaKeyPair, generatekeys, RsaPubKey, RsaPrivKey  } from 'src/app/utils/rsa';
 import * as bigintconversion from 'bigint-conversion'
 
+import * as bcu from 'bigint-crypto-utils';
+import { AnonymousCertificate } from 'src/app/services/certificate.service';
+
 @Component({
   selector: 'app-chat',
   templateUrl: './chat.component.html',
@@ -105,5 +108,51 @@ export class ChatComponent implements OnInit{
         }
     })}
   }
+  publicKey = new RsaPubKey(//llave publica del servidor
+  65537n,
+  140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+  );
+  blindSign() {
+
+    const message = 12345n; // Reemplaza con el mensaje que deseas cegar (en forma de BigInt)
+    const r = 123n; // Reemplaza con el valor de r
+    const llave = new RsaPubKey(this.publicKey.e,this.publicKey.n)//generamos una llave publica del servidor
+    const blindmessage = llave.blindMessage(message,r)// cegamos el mensaje con la llave anterior
+    console.log('blindmessage:', blindmessage);
+    const bmString = blindmessage.toString()//pasamos el bigint a string para enviarlo al server
+    console.log('bmString: ',bmString)
+    this.chat.blindSign(bmString,r)//activamos el evento blindsign del servicio chat
+    this.chat.socket.io.on('Signature', (Signature)=>{// escuchamos la respuesta del evento anterior
+      console.log('Signature: ',Signature)
+      const SignatureBigint = BigInt(Signature)//convertimos la firma de string a biging
+      const llave = new RsaPubKey(this.publicKey.e,this.publicKey.n)//generamos una llave publica del servidor
+      const unblind = llave.unblindSign(r,SignatureBigint)//hacemos el unblind de la firma del servidor, con el valor de cegado r y la Signature del server del mensaje cegado que hemos enviado
+      console.log('unblind:',unblind)
+      const publicKeyJson = localStorage.getItem('publicKey');//recuperamos la llave publica del cliente
+      if (publicKeyJson === null) {
+        console.error('No se encontró la llave privada en localStorage.');
+        return;
+      }
+
+      const publicKey = JSON.parse(publicKeyJson);//obtenemos los valores en string de la llave e y n
+      const e = publicKey.e
+      const n = publicKey.n
+      const certificate: AnonymousCertificate = {//generamos el certificado usando el servicio certificate.service.ts
+        chatId: "ID_DEL_CHAT",//validación para el chat
+        clientPublicKey: {e,n},//llave publica del cliente
+        serverSignature: unblind.toString(), // Utiliza el valor desblindado como la firma del servidor
+      };
+      console.log('certificate: ',certificate)
+    })
+  }
+
+  /*const certificate: AnonymousCertificate = {
+    chatId: "ID_DEL_CHAT",
+    clientPublicKey: "LLAVE_PUBLICA_DEL_CLIENTE",
+    serverSignature: "FIRMA_DEL_SERVIDOR",
+  };*/
+
+
+
 }
 
