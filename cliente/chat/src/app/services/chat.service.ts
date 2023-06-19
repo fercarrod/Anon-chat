@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { SocketService } from './socket.service';
-import { RsaPrivKey } from '../utils/rsa';
+import { RsaPrivKey, RsaPubKey } from '../utils/rsa';
+import * as bigintconversion from 'bigint-conversion'
 
 @Injectable({
   providedIn: 'root'
@@ -42,10 +43,19 @@ export class ChatService {
     })
   }
   //evento para recibir los mensajes del server
+  publicKey = new RsaPubKey(
+    65537n,
+    140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+  );
   getMessage(){
     this.socket.io.on("getMessage",(message)=>{
       console.log("el server a enviado el msg:",message)
-      this.chatsServer.push(message)
+      const ServerSignature = message.mensajeFirmado;
+      console.log('ServerSignature: ', ServerSignature);
+      const msgVerificado = this.publicKey.verify(BigInt(ServerSignature))
+      const msgVerificadotoString = bigintconversion.bigintToText(msgVerificado)
+      console.log('msgVerificadotoString: ',msgVerificadotoString)
+      this.chatsServer.push(msgVerificadotoString)
     })
   }
   getChats(): { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] {

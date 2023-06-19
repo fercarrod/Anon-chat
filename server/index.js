@@ -1,7 +1,7 @@
 const cliente = require('./clientes');
 const bcu = require('bigint-crypto-utils');
 const bigintConversion = require('bigint-conversion');
-const rsa = require('./rsa')
+
 const crypto = require('crypto');
 const app = require('express')()
 const http = require('http').Server(app)
@@ -12,12 +12,39 @@ const io = require('socket.io')(http,{
         methods: ["GET","POST"]
     }
 })
+const { generateKeys, RsaPrivKey, RsaPubKey  } = require('./rsa');
+let serverChatKeyPair;// aqui se guardaran las llaves pública y privada del servidor. Si deseamos crear una enquesta anónima + generar un par de llaves para poder diferenciar si el cliente valida el chat o la enquesta
 
-const clientes = {};// Crear un diccionario para almacenar los datos del cliente
+const publicKey = new RsaPubKey(
+  65537n,
+  140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+);
 
-function guardarDatosCliente(idCliente, datosCliente) {// id numero aleatorio para identificar a los clientes, datos cliente su llave pub? + valido chat
-    clientes[idCliente] = datosCliente;
+const privateKey = new RsaPrivKey(
+  29926461037796230698969337920606994129213447438417776606412550072279159030910461436383271903089422828072462579773290337567587094308196311000862083891141360257908036521527875756952807497325707408343241229288558416553113873442952570858432411717101801859035660946153870633207225035418405953611831448891738010337n,
+  140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+);
+
+//console.log('Server Public Key:', publicKey);
+//console.log('Server Private Key:', privateKey);
+
+/* la función que genera las llaves funcióna y se activa correctamente
+    para probar el funcionamiento del envio, uso unas llaves del servidor predefinidas
+async function generateServerKeys() {
+    try {
+      const bitLength = 1024;
+      serverChatKeyPair = await generateKeys(bitLength);
+      console.log('Llaves del servidor generadas:', serverChatKeyPair);
+      let serverChatpublicKey = serverChatKeyPair.publicKey;
+      let serverChatprivateKey = serverChatKeyPair.privKey;
+      //console.log('serverChatpublicKey:', serverChatpublicKey);
+      console.log('serverChatprivateKey:', serverChatprivateKey);
+    } catch (error) {
+      console.error('Error al generar las llaves del servidor:', error);
+    }
 }
+generateServerKeys()// aqui se activa la función cuando arranca el server */
+
 
 //el servidor se queda escuchando en el puerto 300'
 http.listen(3000,()=>{
@@ -45,7 +72,7 @@ io.on('connection', (socket) => {
         const n = BigInt(publicKey.n);
         //console.log('llave e: ',e )
         //console.log('n: ',n)
-        const llavePub = new rsa.RsaPubKey(e,n)// crear una llave publica del cliente con los valores recibidos
+        const llavePub = new RsaPubKey(e,n)// crear una llave publica del cliente con los valores recibidos
         //console.log('llavePub: ',llavePub)
         const encryptedNonce = llavePub.encrypt(BigInt(nonce))//encryptar el nonce con la llave publica del cliente
         const encryptedNoncetoString = encryptedNonce.toString()
@@ -91,13 +118,22 @@ io.on('connection', (socket) => {
         const n = llavePublicaCliente.llavePublica.n;
         //console.log('Valor de e:', e);
         //console.log('Valor de n:', n);
-        const llave = new rsa.RsaPubKey(e,n)
+        const llave = new RsaPubKey(e,n)
         console.log('llave recuperada: ',llave)
         const decryptMsg = llave.verify(mensajeEncriptadobigint)
         console.log('decryptMsg: ',decryptMsg)
         const messageVerifiedtoText = bigintConversion.bigintToText(decryptMsg)
         console.log('messageVerifiedtoText: ',messageVerifiedtoText)
-        socket.broadcast.emit('getMessage', messageVerifiedtoText);
+        //firmamos el message verificado con la privada del servidor para mantener la comunicación encriptada de extremo a extremo
+        //const ServerPrivKey = new RsaPrivKey(serverChatKeyPair.privKey.d, serverChatKeyPair.privKey.n);
+        //console.log('ServerPrivKey:', ServerPrivKey);
+        
+        const firma = privateKey.sign(bigintConversion.textToBigint(messageVerifiedtoText));
+        console.log('firma: ', firma);
+        
+        const firmaJson = { mensajeFirmado: firma.toString() };
+        socket.broadcast.emit('getMessage', firmaJson);
+        
       });
       
       
