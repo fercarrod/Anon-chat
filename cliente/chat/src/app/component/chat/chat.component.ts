@@ -79,6 +79,7 @@ export class ChatComponent implements OnInit{
       }
 
       const mensajeEncriptadoConId = {
+        messagesinEncriptar: message,
         mensajeEncriptado: mensajeFirmado.toString(),
         clienteId: this.clienteId
       };

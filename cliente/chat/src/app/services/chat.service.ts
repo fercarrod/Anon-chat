@@ -8,13 +8,14 @@ import { RsaPrivKey } from '../utils/rsa';
 export class ChatService {
 
 
-  chats: { mensajeEncriptado: string; clienteId: string }[] = [];//arreglo para guardar los chats
+  chatsLocal: { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] = [];//arreglo para guardar los chats
+  chatsServer:string[]=[]
   constructor(public socket:SocketService) {
     this.getMessage()//cuando se inicia se queda esuchando para recibir msj
   }
   //evento para enviar los mensajes al server
-  sendMessage(message: { mensajeEncriptado: string; clienteId: string }) {
-    this.chats.push(message);
+  sendMessage(message: { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }) {
+    this.chatsLocal.push(message);
     this.socket.io.emit("sendMessage", message);
   }
   login(u:string,p:string){
@@ -44,10 +45,10 @@ export class ChatService {
   getMessage(){
     this.socket.io.on("getMessage",(message)=>{
       console.log("el server a enviado el msg:",message)
-      this.chats.push(message)
+      this.chatsServer.push(message)
     })
   }
-  getChats(): { mensajeEncriptado: string; clienteId: string }[] {
-    return this.chats;
+  getChats(): { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] {
+    return this.chatsLocal;
   }
 }
