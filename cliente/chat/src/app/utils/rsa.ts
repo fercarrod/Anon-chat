@@ -1,4 +1,6 @@
+import { hexToBigint } from 'bigint-conversion'
 import * as bcu from 'bigint-crypto-utils'
+import {digest} from 'object-sha'
 
 // info de que contienen las llaves BlindSignature.pdf transparencia 10
 // Kpub=(e,n)  e=exponente público n=módulo público
@@ -22,6 +24,14 @@ export class RsaPubKey {
   verify (s: bigint): bigint {
     return bcu.modPow(s, this.e, this.n)
   }
+
+  async verifySignature (payload: any, signature: string): Promise<boolean> {
+    const dgst1 = this.verify(BigInt(signature))
+    const dgst2 = hexToBigint(await digest(payload))
+
+    return dgst1 === dgst2
+  }
+
    //blindMessage: Este método toma un mensaje m y un valor de cegado r, y realiza el cegado del mensaje aplicando la fórmula bm = m * r^e mod n.
   blindMessage(m: bigint, r: bigint): bigint {
     const bm = bcu.modPow(r, this.e, this.n);
@@ -54,6 +64,11 @@ export class RsaPrivKey {
  //blindSign: Este método toma un mensaje cegado bs y realiza la firma ciega aplicando la fórmula bs = bm^d mod n.
   blindSign(bm: bigint): bigint {
     return bcu.modPow(bm, this.d, this.n);
+  }
+
+  async signature (m: any): Promise<string> {
+    const dgst = await digest(m)
+    return this.sign(hexToBigint(dgst)).toString()
   }
 }
 export class RsaKeyPair {

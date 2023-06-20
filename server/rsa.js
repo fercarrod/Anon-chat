@@ -1,4 +1,5 @@
 const bcu = require('bigint-crypto-utils');
+const objectSha = require('object-sha');
 // info de que contienen las llaves BlindSignature.pdf transparencia 10
 // Kpub=(e,n)  e=exponente público n=módulo público
 // Kpriv=(d,n) d=exponente privado n=módulo público
@@ -19,8 +20,16 @@ class RsaPubKey {
     return bcu.modPow(s, this.e, this.n);
   }
 
+  async verifySignature (payload, signature) {
+    const dgst1 = this.verify(BigInt(signature))
+    const dgst2 = hexToBigint(await objectSha.digest(payload))
+
+    return dgst1 === dgst2
+  }
+
   blindMessage(m, r) {
     const bm = bcu.modPow(r, this.e, this.n);
+    
     return (m * bm) % this.n;
   }
 
@@ -48,6 +57,11 @@ class RsaPrivKey {
 
   blindSign(bm) {
     return bcu.modPow(bm, this.d, this.n);
+  }
+
+  async signature (m) {
+    const dgst = await objectSha.digest(m)
+    return this.sign(hexToBigint(dgst)).toString()
   }
 }
 

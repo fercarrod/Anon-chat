@@ -63,12 +63,5 @@ export class ChatService {
   }
    blindSign(bmString:string,r:bigint) {
     this.socket.io.emit('blindSign', bmString);
-    this.socket.io.on('Signature', (Signature)=>{
-      console.log('Signature: ',Signature)
-      const SignatureBigint = BigInt(Signature)
-      const llave = new RsaPubKey(this.publicKey.e,this.publicKey.n)
-      const unblind = llave.unblindSign(r,SignatureBigint)
-      console.log('unblind:',unblind)
-    })
   }
 }
