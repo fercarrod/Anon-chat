@@ -150,7 +150,67 @@ export class ChatComponent implements OnInit{
       console.log('certificate: ',certificate)
     })
   }
-  async test() {
+ async test() {
+    try {
+      const publicKeyJson = localStorage.getItem('publicKey');
+      if (publicKeyJson === null) {
+        console.error('No se encontró la llave pública en localStorage.');
+        return;
+      }
+
+      const privateKeyJson = localStorage.getItem('privateKey');
+      if (privateKeyJson === null) {
+        console.error('No se encontró la llave privada en localStorage.');
+        return;
+      }
+
+      const privateKey = JSON.parse(privateKeyJson);
+      const publicKey = JSON.parse(publicKeyJson);
+
+      const llavePUB = new RsaPubKey(BigInt(publicKey.e), BigInt(publicKey.n));
+      const llavePRIV = new RsaPrivKey(BigInt(privateKey.d), BigInt(privateKey.n));
+
+      console.log('---------------------------');
+      console.log('@@@llavePUB:', llavePUB);
+      console.log('@@@llavePRIV:', llavePRIV);
+      console.log('---------------------------');
+
+      const r = bcu.randBetween(llavePUB.n, llavePUB.n / 2n);
+      //console.log('@@@r:', r)
+
+      const data = objectSha.hashable(publicKey);
+      const dgst = await objectSha.digest(data)
+      const digstbig =bigintconversion.hexToBigint(dgst)
+
+
+      const blindmessage = llavePUB.blindMessage(digstbig,r)
+      const blindSign = llavePRIV.sign(blindmessage)
+      const unblind = llavePUB.unblindSign(blindSign,r)
+
+      console.log('---------------------------');
+      //console.log('blindmessage:', blindmessage)
+      //console.log('blindSign:', blindSign);
+      //console.log('unblind:', unblind)
+      console.log('data1:', data)
+      console.log('dgst1:', dgst);
+      console.log('digstbig1:', digstbig);
+      console.log('---------------------------');
+
+
+      const verificarunblind = llavePUB.verify(unblind)
+      const unblindtoHex =bigintconversion.bigintToHex(verificarunblind)
+      console.log('verificarunblind:', verificarunblind);
+      console.log('unblindtoHex:', unblindtoHex);
+
+      if(unblindtoHex===dgst){
+        console.log('son iguales')
+      }
+      else{console.log('certificado no funciona')}
+
+  }catch{console.log('error')}
+}}
+
+  /*async test() {
     // Recuperamos el string de la llave del local storage
     const publicKeyJson = localStorage.getItem('publicKey');
     if (publicKeyJson === null) {
@@ -177,9 +237,8 @@ export class ChatComponent implements OnInit{
       console.log('@@@digest:', digest);
       console.log('---------------------------')
       //console.log('r:', r);
-
-
-
+      //const digestbigint = bigintconversion.hexToBigint(digest)
+      //console.log('digestbigint:',digestbigint)
       // Cegamos el digest utilizando la función blindMessage de RsaPubKey
       const blindedDigest = llave.blindMessage(bigintconversion.hexToBigint(digest), r);
       console.log('Digest cegado:', blindedDigest.toString());
@@ -206,7 +265,7 @@ export class ChatComponent implements OnInit{
     } catch (error) {
       console.error('Error al generar el digest:', error);
     }
-  }
+  }*/
 
 
 
@@ -257,12 +316,3 @@ export class ChatComponent implements OnInit{
       throw new Error('Error al calcular el digest');
     }
   }*/
-
-
-
-
-
-
-
-}
-

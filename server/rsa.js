@@ -1,5 +1,6 @@
 const bcu = require('bigint-crypto-utils');
 const objectSha = require('object-sha');
+const bigintConversion = require('bigint-conversion');
 // info de que contienen las llaves BlindSignature.pdf transparencia 10
 // Kpub=(e,n)  e=exponente público n=módulo público
 // Kpriv=(d,n) d=exponente privado n=módulo público
@@ -20,8 +21,8 @@ class RsaPubKey {
   }
   async verifySignature (payload, signature) {
     const dgst1 = this.verify(BigInt(signature))
-    const dgst2 = hexToBigint(await objectSha.digest(payload,'SHA-512'))
-    console.log('dgst1:',dgst1)
+    const dgst2 = bigintConversion.hexToBigint(await objectSha.digest(payload,'SHA-512'))
+    console.log('dgst1',dgst1)
     console.log('dgst2',dgst2)
     return dgst1 === dgst2
   }

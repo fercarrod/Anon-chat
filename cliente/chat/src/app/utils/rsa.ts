@@ -1,6 +1,7 @@
 import { hexToBigint } from 'bigint-conversion'
 import * as bcu from 'bigint-crypto-utils'
-import {digest} from 'object-sha'
+
+import * as objectSha from 'object-sha';
 
 // info de que contienen las llaves BlindSignature.pdf transparencia 10
 // Kpub=(e,n)  e=exponente público n=módulo público
@@ -26,21 +27,23 @@ export class RsaPubKey {
   }
 
   async verifySignature (payload: any, signature: string): Promise<boolean> {
-    const dgst1 = this.verify(BigInt(signature))
-    const dgst2 = hexToBigint(await digest(payload))
-
-    return dgst1 === dgst2
+    const dgst1 = this.verify(hexToBigint(signature))
+    const dgst2 = objectSha.digest(payload, 'SHA-512')
+    return dgst1.toString() === dgst2.toString()
   }
 
    //blindMessage: Este método toma un mensaje m y un valor de cegado r, y realiza el cegado del mensaje aplicando la fórmula bm = m * r^e mod n.
   blindMessage(m: bigint, r: bigint): bigint {
     const bm = bcu.modPow(r, this.e, this.n);
-    return (m*bm) % this.n
+    //return (m*bm) % this.n
+    return bcu.toZn(m*bm,this.n)
   }
+
 //unblindSign: Este método toma el mensaje cegado firmado bs y el mensaje cegado original bm, y realiza el descegado de la firma aplicando la fórmula ubs = bs * r^-1 mod n.
-  unblindSign(r: bigint,bs: bigint): bigint {
+  unblindSign(bs: bigint,r: bigint): bigint {
     const bsInv = bcu.modInv(r,this.n);
-    return (bs*bsInv) % this.n
+    //return (bs*bsInv) % this.n
+    return bcu.toZn(bs*bsInv,this.n)
   }
 
 }
@@ -67,7 +70,11 @@ export class RsaPrivKey {
   }
 
   async signature (m: any): Promise<string> {
-    const dgst = await digest(m)
+    const dgst = await objectSha.digest(m)
+    console.log('---------------signature---------------')
+    console.log('dgst data2',dgst)
+    console.log(this.sign(hexToBigint(dgst)).toString())
+    console.log('---------------s---------------')
     return this.sign(hexToBigint(dgst)).toString()
   }
 }

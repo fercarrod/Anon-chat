@@ -120,12 +120,13 @@ io.on('connection', (socket) => {
       console.log('sendDigest recibido: ',digest)
       const bigintdgst = BigInt("0x" + digest)
       const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      console.log('firmado con llave: ',llave)
       const dgst = BigInt(bigintdgst)
       const digstfirmado= llave.blindSign(dgst)
       console.log('digstfirmado:',digstfirmado)
       socket.emit('digstfirmado',digstfirmado.toString())
     })
-    socket.on('certificate',async (certificate)=>{
+    /*socket.on('certificate',async (certificate)=>{
       console.log('---------------------')
       console.log('certificate')
       //console.log('Certificate received:', certificate)
@@ -136,18 +137,57 @@ io.on('connection', (socket) => {
       //console.log('objectSha:', objectSha.hashable(data));
       try{
       const digest1 = await objectSha.digest(data, 'SHA-512');
-      console.log('digest1:',digest1)
-      const b = bigintConversion.textToBigint(digest1)
-      const llaveS = new RsaPubKey(publicKey.e, publicKey.n);
-      const signatureBigInt = BigInt(certificate.serverSignature);
+      const signatureBigInt = BigInt(certificate.serverSignature)
+      console.log('digest1:', digest1);
       console.log('signatureBigInt:',signatureBigInt)
-      const a = llaveS.verify(signatureBigInt)
-      console.log('a:', a);
-      console.log('b:', b);
+      const d2 = llaveS.verify(signatureBigInt)
+      console.log('d2:', d2);
+      const d1 = bigintConversion.hexToBigint(digest1)
+      
+      console.log('d1:',d1)
       console.log('si salen a es diferente de b, hay algo que falla')
+      if(d1===d2){
+        console.log('son iguales')
+      }else{
+        console.log('no lo son')
+      }
       }catch{console.log('error')}
       
-    })
+    })*/
+    socket.on('certificate', async (certificate) => {
+      console.log('---------------------');
+      console.log('certificate');
+      console.log('Signature:', certificate.serverSignature);
+      //console.log('Client Public Key:', certificate.clientPublicKey);
+    
+      try {
+        const publicKey = certificate.clientPublicKey;
+        const llaveS = new RsaPubKey(BigInt(publicKey.e), BigInt(publicKey.n));
+    
+        const data = objectSha.hashable(publicKey);
+        const digest = await objectSha.digest(data, 'SHA-512');
+    
+        console.log('Digest:', digest);
+        console.log('Signature:', BigInt(certificate.serverSignature));
+    
+        const dgst1 = llaveS.verify(BigInt(certificate.serverSignature));
+        const dgst2 = bigintConversion.hexToBigint(await objectSha.digest(digest, 'SHA-512'));
+
+        console.log('dgst1:', dgst1);
+        console.log('dgst2:', dgst2);
+        
+        if (dgst1 === dgst2) {
+          console.log('Signature is valid.');
+        } else {
+          console.log('Signature is not valid.');
+        }
+      } catch (error) {
+        console.log('Error:', error);
+      }
+    });
+    
+  
+    
     //evento recibir mensaje y hacer broadcast a todos los clientes
     socket.on('sendMessage', (message) => {
         console.log('Mensaje enviado por el cliente:', message);
