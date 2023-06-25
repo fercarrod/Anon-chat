@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { SocketService } from './socket.service';
 import { RsaPrivKey, RsaPubKey } from '../utils/rsa';
 import * as bigintconversion from 'bigint-conversion'
+import { AnonymousCertificate } from './certificate.service';
 
 @Injectable({
   providedIn: 'root'
@@ -63,5 +64,11 @@ export class ChatService {
   }
    blindSign(bmString:string,r:bigint) {
     this.socket.io.emit('blindSign', bmString);
+  }
+  sendDigest(digest:string){
+    this.socket.io.emit('sendDigest',digest)
+  }
+  sendCertificate(certificate: AnonymousCertificate){
+  this.socket.io.emit('certificate', certificate);
   }
 }

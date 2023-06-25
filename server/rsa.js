@@ -15,18 +15,16 @@ class RsaPubKey {
   encrypt(m) {
     return bcu.modPow(m, this.e, this.n);
   }
-
   verify(s) {
     return bcu.modPow(s, this.e, this.n);
   }
-
   async verifySignature (payload, signature) {
     const dgst1 = this.verify(BigInt(signature))
-    const dgst2 = hexToBigint(await objectSha.digest(payload))
-
+    const dgst2 = hexToBigint(await objectSha.digest(payload,'SHA-512'))
+    console.log('dgst1:',dgst1)
+    console.log('dgst2',dgst2)
     return dgst1 === dgst2
   }
-
   blindMessage(m, r) {
     const bm = bcu.modPow(r, this.e, this.n);
     

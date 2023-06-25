@@ -2,9 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { ChatService } from 'src/app/services/chat.service';
 import { RsaKeyPair, generatekeys, RsaPubKey, RsaPrivKey  } from 'src/app/utils/rsa';
 import * as bigintconversion from 'bigint-conversion'
-
 import * as bcu from 'bigint-crypto-utils';
 import { AnonymousCertificate } from 'src/app/services/certificate.service';
+import * as objectSha from 'object-sha';
 
 @Component({
   selector: 'app-chat',
@@ -20,11 +20,10 @@ export class ChatComponent implements OnInit{
   }
   ngOnInit(): void {
     this.generateKeys()// para que la función que genera las llaves del cliente, se active nada mas activar el cliente
-
   }
     // Función que genera las llaves privada y pública del Cliente
-    generateKeys() {
-      generatekeys(1024).then((keys: RsaKeyPair) => {
+  generateKeys() {
+    generatekeys(1024).then((keys: RsaKeyPair) => {
         console.log('Claves generadas:', keys);
 
         const publicKey = {//transformar las llaves a string
@@ -45,6 +44,14 @@ export class ChatComponent implements OnInit{
       }).catch((error: any) => {
         console.error('Error al generar las claves:', error);
       });
+    }
+    generateRandomBigInt(): bigint {
+      const array = new Uint8Array(32);
+      window.crypto.getRandomValues(array);
+      const hexString = Array.from(array)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+      return BigInt('0x' + hexString);
     }
 
 
@@ -113,7 +120,6 @@ export class ChatComponent implements OnInit{
   140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
   );
   blindSign() {
-
     const message = 12345n; // Reemplaza con el mensaje que deseas cegar (en forma de BigInt)
     const r = 123n; // Reemplaza con el valor de r
     const llave = new RsaPubKey(this.publicKey.e,this.publicKey.n)//generamos una llave publica del servidor
@@ -133,7 +139,6 @@ export class ChatComponent implements OnInit{
         console.error('No se encontró la llave privada en localStorage.');
         return;
       }
-
       const publicKey = JSON.parse(publicKeyJson);//obtenemos los valores en string de la llave e y n
       const e = publicKey.e
       const n = publicKey.n
@@ -145,12 +150,117 @@ export class ChatComponent implements OnInit{
       console.log('certificate: ',certificate)
     })
   }
+  async test() {
+    // Recuperamos el string de la llave del local storage
+    const publicKeyJson = localStorage.getItem('publicKey');
+    if (publicKeyJson === null) {
+      console.error('No se encontró la llave pública en localStorage.');
+      return;
+    }
 
-  /*const certificate: AnonymousCertificate = {
-    chatId: "ID_DEL_CHAT",
-    clientPublicKey: "LLAVE_PUBLICA_DEL_CLIENTE",
-    serverSignature: "FIRMA_DEL_SERVIDOR",
-  };*/
+    // Generamos la llave pública recuperada
+    const publicKey = JSON.parse(publicKeyJson);
+    const e = publicKey.e;
+    const n = publicKey.n;
+    const llave = new RsaPubKey(BigInt(e), BigInt(n));
+    console.log('---------------------------')
+    //console.log('@@@@ publicKey,:',publicKey)
+    // Comprobamos que la llave tiene un valor correcto para hacer el hash
+    const data = objectSha.hashable(publicKey); // Preparar el objeto para ser hashable
+    //console.log('@@@data:',data)
+    //console.log('objectSha:', objectSha.hashable(data));
+
+    try {
+      // Generamos el digest utilizando SHA-512
+      const r = bcu.randBetween(llave.n, llave.n/ bigintconversion.textToBigint("2") )
+      const digest = await objectSha.digest(data, 'SHA-512');
+      console.log('@@@digest:', digest);
+      console.log('---------------------------')
+      //console.log('r:', r);
+
+
+
+      // Cegamos el digest utilizando la función blindMessage de RsaPubKey
+      const blindedDigest = llave.blindMessage(bigintconversion.hexToBigint(digest), r);
+      console.log('Digest cegado:', blindedDigest.toString());
+
+      // Enviamos el digest cegado al servidor para que lo firme
+      this.chat.sendDigest(blindedDigest.toString());
+
+      this.chat.socket.io.on('digstfirmado', (digstfirmado) => {
+        //console.log('digstfirmado', digstfirmado);
+
+        // Descegamos el digest firmado utilizando la función unblindMessage de RsaPubKey
+        const unblindedDigest = llave.unblindSign(BigInt(digstfirmado), r);
+        //console.log('Digest descegado:', unblindedDigest.toString());
+
+
+        const certificate: AnonymousCertificate = {//generamos el certificado usando el servicio certificate.service.ts
+          chatId: "id_que_envia_elserver",//validación para el chat
+          clientPublicKey: {e,n},//llave publica del cliente
+          serverSignature: unblindedDigest.toString(), // Utiliza el valor desblindado como la firma del servidor
+        };
+        console.log('certificate:',certificate)
+        this.chat.sendCertificate(certificate)
+      });
+    } catch (error) {
+      console.error('Error al generar el digest:', error);
+    }
+  }
+
+
+
+/*
+  test() {
+    const publicKeyJson = localStorage.getItem('publicKey');
+    if (publicKeyJson === null) {
+      console.error('No se encontró la llave pública en localStorage.');
+      return;
+    }
+    const publicKey = JSON.parse(publicKeyJson);
+    const e = publicKey.e;
+    const n = publicKey.n;
+    const llave = new RsaPubKey(e, n);
+
+    const data = publicKeyJson; // Reemplaza con el string que deseas generar el digest
+
+    sha256(data).then((digestValue) => {
+      const numericDigest = parseInt(digestValue, 16);
+      if (isNaN(numericDigest)) {
+        console.error('Error al generar el digest. El valor no es un número entero válido.');
+        return;
+      }
+
+      console.log('Digest:', numericDigest);
+
+      // Generar un valor aleatorio seguro como BigInt para cegar el digest
+      const r = randBetween(2n, llave.n ** 256n);
+      // Cegar el digest utilizando la función blindMessage de RsaPubKey
+      const blindedDigest = llave.blindMessage(BigInt(numericDigest), r);
+      console.log('Digest cegado:', blindedDigest.toString());
+      // Aquí puedes realizar cualquier otra acción con el digest cegado
+    }).catch((error) => {
+      console.error('Error al generar el digest:', error);
+    });
+  }
+
+  async generateDigest(data: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const encodedData = encoder.encode(data);
+
+    try {
+      const digestBuffer = await crypto.subtle.digest('SHA-256', encodedData);
+      const digestArray = Array.from(new Uint8Array(digestBuffer));
+      const digestHex = digestArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return digestHex;
+    } catch (error) {
+      throw new Error('Error al calcular el digest');
+    }
+  }*/
+
+
+
+
 
 
 

@@ -1,7 +1,7 @@
 const cliente = require('./clientes');
 const bcu = require('bigint-crypto-utils');
 const bigintConversion = require('bigint-conversion');
-
+const objectSha = require('object-sha');
 const crypto = require('crypto');
 const app = require('express')()
 const http = require('http').Server(app)
@@ -56,9 +56,13 @@ app.get('/',(req,res)=>{
 })
 //evento de conexión, muestra con terminal nueva conexión y los mensajes que envian los clientes
 io.on('connection', (socket) => {
+  console.log('---------------------')
+  console.log('connection')
     console.log('Nueva conexión');
     //evento login
     socket.on('login',(texto,stringllavepub)=>{
+      console.log('---------------------')
+      console.log('login')
         //console.log('texto: ',texto)
         //console.log('stringllavepub: ',stringllavepub)
         // Generar un nonce aleatorio
@@ -79,6 +83,8 @@ io.on('connection', (socket) => {
         //console.log('encryptedNonce:',encryptedNonce)
         socket.emit('login1', encryptedNoncetoString)//evento que emite al cliente el nonce encriptado
         socket.on('desencryptedNonce', (desencryptedNonce) => {//evento que recibe el nonce desencriptado en el cliente, si es igual al enviado autentificación correcta
+          console.log('---------------------')
+          console.log('desencryptedNonce')
             //console.log('Nonce desencriptado en el cliente:', desencryptedNonce);
             if(desencryptedNonce === nonce){//si son iguales login correcto, llave publica del cliente verificada
                 //guardar en base datos
@@ -99,12 +105,48 @@ io.on('connection', (socket) => {
           });
     })
     socket.on('blindSign', (bmString) => {
+      console.log('---------------------')
+      console.log('blindSign')
       console.log('bm recibido: ',bmString)
       const blindedMessage = BigInt(bmString);
       const llave = new RsaPrivKey(privateKey.d,privateKey.n)
       const blindSignature = llave.blindSign(blindedMessage)
       console.log('blindSignature: ',blindSignature)
       socket.emit('Signature', blindSignature.toString());
+    })
+    socket.on('sendDigest',(digest)=>{
+      console.log('---------------------')
+      console.log('sendDigest')
+      console.log('sendDigest recibido: ',digest)
+      const bigintdgst = BigInt("0x" + digest)
+      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      const dgst = BigInt(bigintdgst)
+      const digstfirmado= llave.blindSign(dgst)
+      console.log('digstfirmado:',digstfirmado)
+      socket.emit('digstfirmado',digstfirmado.toString())
+    })
+    socket.on('certificate',async (certificate)=>{
+      console.log('---------------------')
+      console.log('certificate')
+      //console.log('Certificate received:', certificate)
+      //console.log('Client Public Key:', certificate.clientPublicKey);
+      console.log('Signature:', certificate.serverSignature);
+      const data = objectSha.hashable(certificate.clientPublicKey); // Preparar el objeto para ser hashable
+      //console.log('@@@data:',data)
+      //console.log('objectSha:', objectSha.hashable(data));
+      try{
+      const digest1 = await objectSha.digest(data, 'SHA-512');
+      console.log('digest1:',digest1)
+      const b = bigintConversion.textToBigint(digest1)
+      const llaveS = new RsaPubKey(publicKey.e, publicKey.n);
+      const signatureBigInt = BigInt(certificate.serverSignature);
+      console.log('signatureBigInt:',signatureBigInt)
+      const a = llaveS.verify(signatureBigInt)
+      console.log('a:', a);
+      console.log('b:', b);
+      console.log('si salen a es diferente de b, hay algo que falla')
+      }catch{console.log('error')}
+      
     })
     //evento recibir mensaje y hacer broadcast a todos los clientes
     socket.on('sendMessage', (message) => {

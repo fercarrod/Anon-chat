@@ -1,6 +1,7 @@
 <p>chat works!</p>
 <button (click)="login()">login</button>
 <button (click)="blindSign()">Firma Ciega</button>
+<button (click)="test()">test</button>
 <div class="chatContainer">
   <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat.messagesinEncriptar }}</p>
   <p class="remoto" *ngFor="let chat of chat.chatsServer">{{ chat }}</p>
