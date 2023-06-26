@@ -1,4 +1,5 @@
 const cliente = require('./clientes');
+const certificado = require('./confirmarCertificado.js')
 const bcu = require('bigint-crypto-utils');
 const bigintConversion = require('bigint-conversion');
 const objectSha = require('object-sha');
@@ -83,6 +84,48 @@ io.on('connection', (socket) => {
         console.log('-------------------');
       */
       });
+    socket.on('ConfirmaCerti',async (comprobar)=>{
+      console.log('@')
+      //console.log(comprobar)
+      // Obtener los valores individuales
+      const telefono = comprobar.telefono;
+      const id = comprobar.id;
+      const llave = comprobar.llave;
+      const Signature = comprobar.Signature;
+      console.log('-------------------');
+      console.log('Telefono:', telefono);
+      console.log('ID:', id);
+      console.log('Llave:', llave);
+      console.log('Signature:', Signature)
+      console.log('-------------------');
+      //para la comprobación usar la llave para obtener un digest usando la función hash
+      //y verificar la Signature usando la llave publica del server y obtenemos otro digest
+      //si los digest1 y dgst2 son iguales certificado correcto, dar id anonima al tlf
+      const valorllave = JSON.parse(llave);
+      const e = valorllave.e;
+      const n = valorllave.n;
+      //console.log('Valor de e:', e);
+      //console.log('Valor de n:', n);
+      const publicKeyCliente = new RsaPubKey(BigInt(e),BigInt(n))
+      console.log(publicKeyCliente)
+      console.log('-------------------');
+      const data = objectSha.hashable(valorllave);//preparación de la llave publica para realizar el hash
+      const dgst1 = await objectSha.digest(data)// generamos el digest de la llave publica cliente, este es el valor que se usara para la comprobación
+      console.log('dgst:',dgst1)
+
+      const llavePUBServer= new RsaPubKey(publicKey.e,publicKey.n)
+      console.log('llavePUBServer:',llavePUBServer)
+      const verificarSign = llavePUBServer.verify(BigInt(Signature))
+      console.log('verificarSign:',verificarSign)
+      const dgst2 =bigintConversion.bigintToHex(verificarSign)
+      console.log('dgst:',dgst1)
+      console.log('dgst2:',dgst2)
+      if(dgst1===dgst2){
+        console.log('okay')
+      }else{
+        console.log('error en certi')
+      }
+    })
     
 
     socket.on('blindSign', (bmString) => {
@@ -189,43 +232,60 @@ io.on('connection', (socket) => {
   
     
     //evento recibir mensaje y hacer broadcast a todos los clientes
-    socket.on('sendMessage', (message) => {
-        console.log('Mensaje enviado por el cliente:', message);
-        const clienteId = message.clienteId;
-        const mensajeEncriptado = message.mensajeEncriptado;
-        const mensajeEncriptadobigint =BigInt(mensajeEncriptado)
+    socket.on('sendMessage', async (message) => {
+      console.log('Mensaje enviado por el cliente:', message);
         
-        console.log('Mensaje encriptado:', mensajeEncriptadobigint);
-        //console.log('ID del cliente:', clienteId);
-        
-        const llavesPublicasClientes = cliente.obtenerClientes();// Obtener todas las llaves públicas de los clientes registrados
-        //console.log('llavesPublicasClientes todas: ',llavesPublicasClientes)
-        const llavePublicaCliente = llavesPublicasClientes.find(cliente => cliente.clienteId === clienteId);// Buscar la llave pública correspondiente al ID del cliente recibido
-        //console.log('llavePublicaCliente: ',llavePublicaCliente)
-        
-        // Acceso utilizando la notación de punto
-        const e = llavePublicaCliente.llavePublica.e;
-        const n = llavePublicaCliente.llavePublica.n;
-        //console.log('Valor de e:', e);
-        //console.log('Valor de n:', n);
-        const llave = new RsaPubKey(e,n)
-        console.log('llave recuperada: ',llave)
-        const decryptMsg = llave.verify(mensajeEncriptadobigint)
-        console.log('decryptMsg: ',decryptMsg)
-        const messageVerifiedtoText = bigintConversion.bigintToText(decryptMsg)
-        console.log('messageVerifiedtoText: ',messageVerifiedtoText)
-        //firmamos el message verificado con la privada del servidor para mantener la comunicación encriptada de extremo a extremo
-        //const ServerPrivKey = new RsaPrivKey(serverChatKeyPair.privKey.d, serverChatKeyPair.privKey.n);
-        //console.log('ServerPrivKey:', ServerPrivKey);
-        
-        const firma = privateKey.sign(bigintConversion.textToBigint(messageVerifiedtoText));
-        console.log('firma: ', firma);
-        
-        const firmaJson = { mensajeFirmado: firma.toString() };
-        socket.broadcast.emit('getMessage', firmaJson);
-        
-      });
-    })
+      // Aquí puedes acceder a los datos individuales del mensaje
+      const mensajeEncriptado = message.mensajeEncriptado;
+      const clienteId = message.clienteId;
+      const llave = message.llave;
+      const signature = message.Signature;
+      //console.log('mensajeEncriptado:', mensajeEncriptado);
+      //console.log('clienteId:', clienteId);
+      //console.log('llave:', llave);
+      const valorllaveCliente = JSON.parse(llave)
+      const e= valorllaveCliente.e
+      const n = valorllaveCliente.n
+      const llavePUBCliente = new RsaPubKey(BigInt(e),BigInt(n))
+      const llavePUBServer = new RsaPubKey(publicKey.e,publicKey.n)
+      const llavePRIVServer = new RsaPrivKey(privateKey.d,privateKey.n)
+      /*const e = valorllaveCliente.e;
+      const n = valorllaveCliente.n;
+      console.log('Valor de e:', e);
+      console.log('Valor de n:', n);*/
+      //console.log('signature:', signature);
+    
+      try {
+        const resultado = await certificado.confirmarCertificado(llavePUBServer,valorllaveCliente, signature);
+        console.log('resultado:', resultado);
+        if (resultado.success) {
+          console.log('certi okay')
+          //1.Desencrypt mensajeEncriptado con llave publica server
+          console.log('mensajeEncriptado:', mensajeEncriptado);
+          console.log(BigInt(mensajeEncriptado))
+          const desencriptado = llavePRIVServer.dencrypt(BigInt(mensajeEncriptado))
+          console.log('desencriptado: ',desencriptado)
+          const text = bigintConversion.bigintToText(desencriptado)
+          console.log('msg del cliente:',text)
+          //3.Firmar con la llave del servidor
+          const SignMessage = llavePRIVServer.sign(desencriptado)
+          socket.broadcast.emit('getMessage',SignMessage.toString())
+          //4. hacer un broadcast emit
+        } else if (resultado.error) {
+          console.log('certi invalido')
+          //emitir certificado invalido no puedes escribir
+        }
+        // Realiza cualquier lógica adicional que necesites con los datos del mensaje
+      } catch (error) {
+        console.error('Error al confirmar el certificado:', error);
+        // Realiza acciones adicionales en caso de error
+      }
+      
+      // Emitir un evento 'getMessage' a todos los clientes conectados (incluido el remitente)
+      //io.emit('getMessage', message);
+    });
+    
+  })
       
     /* 
     //evento login

@@ -30,7 +30,7 @@
   <button (click)="CrearCertificado()">Crear Certificado</button>
 <!-- Sección de chatContainer -->
 <div *ngIf="certificadoCreado" class="chatContainer">
-  <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat.messagesinEncriptar }}</p>
+  <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat }}</p>
   <p class="remoto" *ngFor="let chat of chat.chatsServer">{{ chat }}</p>
 </div>
 

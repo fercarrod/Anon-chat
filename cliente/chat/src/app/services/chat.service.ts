@@ -9,19 +9,28 @@ import { AnonymousCertificate } from './certificate.service';
 })
 export class ChatService {
 
-
-  chatsLocal: { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] = [];//arreglo para guardar los chats
+  chatsLocal: string[] = [];//arreglo para guardar los chats
   chatsServer:string[]=[]
   constructor(public socket:SocketService) {
     this.getMessage()//cuando se inicia se queda esuchando para recibir msj
   }
   //evento para enviar los mensajes al server
-  sendMessage(message: { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }) {
-    this.chatsLocal.push(message);
+  sendMessage(chatlocal:string, mensajeEncriptado: string, clienteId: string, llave: string, signature: string) {
+    const message = {
+      mensajeEncriptado,
+      clienteId,
+      llave,
+      Signature: signature
+    };
+    this.chatsLocal.push(chatlocal);
     this.socket.io.emit("sendMessage", message);
   }
+
   SignUp(u:string,t:string){
     this.socket.io.emit('Registro',u,t)
+  }
+  ConfirmaCerti(comprobar: { telefono: string; id: string; llave: string; Signature: string }){
+    this.socket.io.emit('ConfirmaCerti',comprobar)
   }
   login(u:string,p:string){
     this.socket.io.emit('login',u,p)
@@ -47,25 +56,19 @@ export class ChatService {
     })
   }
   //evento para recibir los mensajes del server
-  publicKey = new RsaPubKey(//llave publica del servidor
-    65537n,
-    140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
-  );
   getMessage(){
     this.socket.io.on("getMessage",(message)=>{
       console.log("el server a enviado el msg:",message)
-      const ServerSignature = message.mensajeFirmado;
-      console.log('ServerSignature: ', ServerSignature);
-      const msgVerificado = this.publicKey.verify(BigInt(ServerSignature))
+      const msgVerificado = this.publicKeyServer.verify(BigInt(message))
       const msgVerificadotoString = bigintconversion.bigintToText(msgVerificado)
       console.log('msgVerificadotoString: ',msgVerificadotoString)
       this.chatsServer.push(msgVerificadotoString)
     })
   }
-  getChats(): { messagesinEncriptar:string; mensajeEncriptado: string; clienteId: string }[] {
+  getChats(): { }[] {
     return this.chatsLocal;
   }
-   blindSign(bmString:string,r:bigint) {
+  blindSign(bmString:string,r:bigint) {
     this.socket.io.emit('blindSign', bmString);
   }
   blindmessage(digest:string){
@@ -77,4 +80,8 @@ export class ChatService {
   sendCertificate(certificate: AnonymousCertificate){
   this.socket.io.emit('certificate', certificate);
   }
+  publicKeyServer = new RsaPubKey(
+    65537n,
+    175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
+  );
 }

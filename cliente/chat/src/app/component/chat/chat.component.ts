@@ -28,7 +28,8 @@ export class ChatComponent implements OnInit{
 
   }
   ngOnInit(): void {
-   // this.isLoggedIn = true//quitar para que fufe el login
+    this.isLoggedIn = true//quitar para que fufe el login
+    this.certificadoCreado = true
     this.generateKeys()// para que la función que genera las llaves del cliente, se active nada mas activar el cliente
   }
     // Función que genera las llaves privada y pública del Cliente
@@ -67,44 +68,47 @@ export class ChatComponent implements OnInit{
 
     sendMessage() {
       const message = this.text; // Guardar el texto introducido en el navegador en la variable "message"
-      console.log('El mensaje a firmar es:', message);
+      console.log('El mensaje a Encriptar:', message);
+      // Recuperar la llave pública del servidor
+      const llavePUBServer = new RsaPubKey(this.publicKeyServer.e, this.publicKeyServer.n);
 
-      const privateKeyJson = localStorage.getItem('privateKey');
-      if (privateKeyJson === null) {
-        console.error('No se encontró la llave privada en localStorage.');
+      // Recuperar el certificado anónimo desde el localStorage
+      const storedCertificate = localStorage.getItem('certificate');
+      if (!storedCertificate) {
+        console.error('No se encontró el certificado en localStorage.');
         return;
       }
+      const certificate = JSON.parse(storedCertificate);
+      const chatId = certificate.chatId;
+      const clientPublicKey = certificate.clientPublicKey;
+      const serverSignature = certificate.serverSignature;
 
-      const privateKey = JSON.parse(privateKeyJson);
-      const d = BigInt(privateKey.d);
-      const n = BigInt(privateKey.n);
+      console.log('llavePUBServer con la que se Encripta:', llavePUBServer);
+      console.log('certificate:', certificate);
 
-      const rsaPrivKey = new RsaPrivKey(d, n);
-      console.log('rsaPrivKey con la que se firma:', rsaPrivKey);
+      // Encriptar el mensaje usando la llave pública del servidor
+      const bigintMessage =bigintconversion.textToBigint(message)
+      const mensajeEncriptado = llavePUBServer.encrypt(bigintMessage);
 
-      const mensajeFirmado = rsaPrivKey.sign(bigintconversion.textToBigint(message));
-      console.log('Este es el mensaje firmado:', mensajeFirmado);
+      // Firmar el mensaje encriptado usando la llave privada del cliente
+      console.log('Este es el mensajeEncriptado:', mensajeEncriptado);
 
-      const mensajeFirmadoJson = {
-        mensajeFirmado: mensajeFirmado.toString(),
-        clienteId: this.clienteId
+      // Crear un objeto con el mensaje firmado y los datos del certificado
+      const objeto = {
+        mensajeEncriptado: mensajeEncriptado.toString(),
+        clienteId: chatId,
+        llave: JSON.stringify(clientPublicKey),
+        Signature: serverSignature
       };
 
-      const mensajeEncriptadoJsonString = JSON.stringify(mensajeFirmadoJson);
+      const mensajeEncriptadoJsonString = JSON.stringify(objeto);
       console.log('Mensaje encriptado en formato JSON:', mensajeEncriptadoJsonString);
 
       if (mensajeEncriptadoJsonString === null) {
         console.error('No se encontró el mensaje encriptado en localStorage.');
         return;
       }
-
-      const mensajeEncriptadoConId = {
-        messagesinEncriptar: message,
-        mensajeEncriptado: mensajeFirmado.toString(),
-        clienteId: this.clienteId
-      };
-
-      this.chat.sendMessage(mensajeEncriptadoConId);
+      this.chat.sendMessage(message,mensajeEncriptado.toString(), chatId, JSON.stringify(clientPublicKey), serverSignature);
     }
 
     onSignUp(){
@@ -182,13 +186,23 @@ export class ChatComponent implements OnInit{
         console.log('unblind:', unblind)// en unblind, tenemos la firma del servidor para generar el certificado
 
         const certificate: AnonymousCertificate = {//generamos el certificado usando el servicio certificate.service.ts
-          chatId: "id_que_envia_elserver",//validación para el chat
+          chatId: "valido chat anon",//validación para el chat
           clientPublicKey: publicKey,//llave publica del cliente
           serverSignature: unblind.toString(), // Utiliza el valor desblindado como la firma del servidor
         };
         console.log('certificate:',certificate)
         localStorage.setItem('certificate', JSON.stringify(certificate))//guardamos el certificado en el localstorage del navegador
         this.certificadoCreado = true;//ponemos el boolean en true
+        const telefono = this.telefono
+        //enviamos telefono + certificado para que el servidor compruebe el certificado y nos de la id anonima
+        const comprobar = {
+          telefono: telefono,
+          id: certificate.chatId,
+          llave: JSON.stringify(certificate.clientPublicKey),
+          Signature: certificate.serverSignature
+        };
+        console.log('comprobar',comprobar)
+        this.chat.ConfirmaCerti(comprobar)
     })
 
   }catch{console.log('error')}
@@ -361,3 +375,47 @@ export class ChatComponent implements OnInit{
       console.log('certificate: ',certificate)
     })
   }*/
+
+  /**
+   *  sendMessage() {
+      const message = this.text; // Guardar el texto introducido en el navegador en la variable "message"
+      console.log('El mensaje a firmar es:', message);
+
+      const privateKeyJson = localStorage.getItem('privateKey');
+      if (privateKeyJson === null) {
+        console.error('No se encontró la llave privada en localStorage.');
+        return;
+      }
+
+      const privateKey = JSON.parse(privateKeyJson);
+      const d = BigInt(privateKey.d);
+      const n = BigInt(privateKey.n);
+
+      const rsaPrivKey = new RsaPrivKey(d, n);
+      console.log('rsaPrivKey con la que se firma:', rsaPrivKey);
+
+      const mensajeFirmado = rsaPrivKey.sign(bigintconversion.textToBigint(message));
+      console.log('Este es el mensaje firmado:', mensajeFirmado);
+
+      const mensajeFirmadoJson = {
+        mensajeFirmado: mensajeFirmado.toString(),
+        clienteId: this.clienteId
+      };
+
+      const mensajeEncriptadoJsonString = JSON.stringify(mensajeFirmadoJson);
+      console.log('Mensaje encriptado en formato JSON:', mensajeEncriptadoJsonString);
+
+      if (mensajeEncriptadoJsonString === null) {
+        console.error('No se encontró el mensaje encriptado en localStorage.');
+        return;
+      }
+
+      const mensajeEncriptadoConId = {
+        messagesinEncriptar: message,
+        mensajeEncriptado: mensajeFirmado.toString(),
+        clienteId: this.clienteId
+      };
+
+      this.chat.sendMessage(mensajeEncriptadoConId);
+    }
+   */
