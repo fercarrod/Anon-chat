@@ -1,29 +1,22 @@
-let contador = 0;
-const clientes = {};
+// cliente.js
 
-function incrementarContador() {
-  contador++;
+// Objeto para almacenar los usuarios
+const users = {};
+
+// Función para guardar datos del usuario
+function saveUserData(username, telefono) {
+  // Verificar si el teléfono ya existe
+  const existingUser = Object.values(users).find(user => user.telefono === telefono);
+  if (existingUser) {
+    return { error: 'El teléfono ya está registrado.' };
+  }
+
+  users[username] = { telefono };
+  return { success: 'Usuario registrado.' };
 }
 
-function obtenerContador() {
-  return contador;
-}
-
-function guardarCliente(llavePublica) {
-  const clienteId = ++contador;
-  clientes[clienteId] = { clienteId, llavePublica };
-  //console.log('function id: ', clienteId);
-  //console.log('function llave: ', clientes[clienteId]);
-  return clienteId;
-}
-
-function obtenerClientes() {
-  return Object.values(clientes);
-}
-
+// Exportar el diccionario y la función
 module.exports = {
-  incrementarContador,
-  obtenerContador,
-  guardarCliente,
-  obtenerClientes
+  users,
+  saveUserData
 };

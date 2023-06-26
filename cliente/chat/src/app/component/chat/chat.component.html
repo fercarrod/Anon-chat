@@ -1,31 +1,42 @@
 <div *ngIf="!isLoggedIn" class="login-container">
   <div class="login-popup">
     <h2>Iniciar sesión</h2>
-    <form (submit)="onLoginSubmit()">
+    <form (submit)="onSignUp()">
       <!-- Campos de inicio de sesión -->
       <label for="username">Usuario:</label>
       <input type="text" id="username" name="username" [(ngModel)]="username">
-      <label for="password">Contraseña:</label>
-      <input type="password" id="password" name="password" [(ngModel)]="password">
+      <label for="telefono">telefono:</label>
+      <input type="telefono" id="telefono" name="telefono" [(ngModel)]="telefono">
       <!-- Botones -->
       <div class="button-group">
-        <button type="submit" class="login-button">Iniciar sesión</button>
+        <!--<button type="submit" class="login-button">Iniciar sesión</button>-->
         <button type="button" class="signup-button" (click)="onSignUp()">Registrarse</button>
       </div>
     </form>
   </div>
 </div>
+<!-- Mostrar mensaje de éxito -->
+<div *ngIf="successMessage" class="success-message">
+  {{ successMessage }}
+</div>
+<!-- Mostrar mensaje de error -->
+<div *ngIf="errorMessage" class="error-message">
+  {{ errorMessage }}
+</div>
+
 
 <div *ngIf="isLoggedIn" class="app-container">
-  <button (click)="blindSign()">Firma Ciega</button>
-  <button (click)="test()">Test</button>
-  <div class="chatContainer">
-    <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat.messagesinEncriptar }}</p>
-    <p class="remoto" *ngFor="let chat of chat.chatsServer">{{ chat }}</p>
-  </div>
 
-  <div class="inputContainer">
-    <input [(ngModel)]="text" [ngModelOptions]="{standalone:true}" type="text">
-    <button (click)="sendMessage()" [disabled]="!isLoggedIn">Enviar</button>
-  </div>
+  <button (click)="CrearCertificado()">Crear Certificado</button>
+<!-- Sección de chatContainer -->
+<div *ngIf="certificadoCreado" class="chatContainer">
+  <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat.messagesinEncriptar }}</p>
+  <p class="remoto" *ngFor="let chat of chat.chatsServer">{{ chat }}</p>
 </div>
+
+<!-- Sección de inputContainer -->
+<div *ngIf="certificadoCreado" class="inputContainer">
+  <input [(ngModel)]="text" [ngModelOptions]="{standalone:true}" type="text">
+  <button (click)="sendMessage()" [disabled]="!isLoggedIn">Enviar</button>
+</div>
+

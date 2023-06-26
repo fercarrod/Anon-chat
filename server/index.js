@@ -17,12 +17,12 @@ let serverChatKeyPair;// aqui se guardaran las llaves pública y privada del ser
 
 const publicKey = new RsaPubKey(
   65537n,
-  140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+  175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
 );
 
 const privateKey = new RsaPrivKey(
-  29926461037796230698969337920606994129213447438417776606412550072279159030910461436383271903089422828072462579773290337567587094308196311000862083891141360257908036521527875756952807497325707408343241229288558416553113873442952570858432411717101801859035660946153870633207225035418405953611831448891738010337n,
-  140664883958549205430563974704354914598455261046516949397866979422431273428155985882252778506259162582183531527691467320746392842263233280790611661190112003621949382043748333564685519676247439224716916609224357730836368911854234644487830993498871160349665704101883268307331259343215341765205249423456401912379n
+  75456502557277026526123377493375928645869721466418857599026975315043129364972918622201370411246055316591215591360005523996356649683786414767407947704394647567284725479192980459321523657123422907946853497023907676171905762287798267845031556025361484222596514903007650599789214986162426285218570158514041859233n,
+  175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
 );
 
 //console.log('Server Public Key:', publicKey);
@@ -54,56 +54,37 @@ http.listen(3000,()=>{
 app.get('/',(req,res)=>{
     console.log('hola')
 })
+
 //evento de conexión, muestra con terminal nueva conexión y los mensajes que envian los clientes
 io.on('connection', (socket) => {
   console.log('---------------------')
   console.log('connection')
-    console.log('Nueva conexión');
-    //evento login
-    socket.on('login',(texto,stringllavepub)=>{
+  console.log('Nueva conexión');
+
+    socket.on('Registro',(user,telefono)=>{
+      console.log('user: ',user)
+      console.log('tlf: ',telefono)
+      const result = cliente.saveUserData(user,telefono)// guardamos el cliente en el diccionario que funciona como base de datos 
+      if (result.error) {
+        console.log('Error:', result.error);
+      } else if (result.success) {
+        console.log('Éxito:', result.success);
+      }
+      socket.emit('RegistroResult',result)
+      console.log('-------------------');
+      /*
+      //bucle para imprimir el diccionario de usuarios
+      console.log('Datos de usuarios:');
       console.log('---------------------')
-      console.log('login')
-        //console.log('texto: ',texto)
-        //console.log('stringllavepub: ',stringllavepub)
-        // Generar un nonce aleatorio
-        //const nonceBytes = crypto.randomBytes(16);
-        //const nonce = nonceBytes.toString('hex');
-        const nonce = '1234567890'
-        //console.log('nonce: ', nonce)
-        // recuperar los string de la llave publica recibida, y pasarlos a bigint
-        const publicKey = JSON.parse(stringllavepub);
-        const e = BigInt(publicKey.e);
-        const n = BigInt(publicKey.n);
-        //console.log('llave e: ',e )
-        //console.log('n: ',n)
-        const llavePub = new RsaPubKey(e,n)// crear una llave publica del cliente con los valores recibidos
-        //console.log('llavePub: ',llavePub)
-        const encryptedNonce = llavePub.encrypt(BigInt(nonce))//encryptar el nonce con la llave publica del cliente
-        const encryptedNoncetoString = encryptedNonce.toString()
-        //console.log('encryptedNonce:',encryptedNonce)
-        socket.emit('login1', encryptedNoncetoString)//evento que emite al cliente el nonce encriptado
-        socket.on('desencryptedNonce', (desencryptedNonce) => {//evento que recibe el nonce desencriptado en el cliente, si es igual al enviado autentificación correcta
-          console.log('---------------------')
-          console.log('desencryptedNonce')
-            //console.log('Nonce desencriptado en el cliente:', desencryptedNonce);
-            if(desencryptedNonce === nonce){//si son iguales login correcto, llave publica del cliente verificada
-                //guardar en base datos
-                //decirle al cliente que todo okay
-                //console.log('nonce iguales, login okay')
-                const idcliente = cliente.guardarCliente(llavePub)//guardamos la llave del cliente para poder verificar sus mensajes firmados
-                //console.log('idcliente:',idcliente)
-                const respuesta = {
-                    mensaje: 'okay',
-                    clienteId: idcliente
-                  };
-                socket.emit('validochat',respuesta)//evento que comunica al cliente que el login es correcto
-            }
-            else{
-                console.log('nonce difrentes, mal login')
-                socket.emit('validochat','no')//evento que comunica al cliente que el login es incorrecto, no a podido desencriptar el nonce no es propietario de la llave publica recibida
-            }
-          });
-    })
+      Object.keys(cliente.users).forEach(username => {
+        const user = cliente.users[username];
+        console.log('Username:', username);
+        console.log('Teléfono:', user.telefono);
+        console.log('-------------------');
+      */
+      });
+    
+
     socket.on('blindSign', (bmString) => {
       console.log('---------------------')
       console.log('blindSign')
@@ -114,18 +95,37 @@ io.on('connection', (socket) => {
       console.log('blindSignature: ',blindSignature)
       socket.emit('Signature', blindSignature.toString());
     })
-    socket.on('sendDigest',(digest)=>{
+
+
+    
+
+    socket.on('blindmessage',(blindmessage)=>{
       console.log('---------------------')
-      console.log('sendDigest')
-      console.log('sendDigest recibido: ',digest)
-      const bigintdgst = BigInt("0x" + digest)
+      console.log('blindmessage')
+      console.log('blindmessage recibido: ',blindmessage)
+      const bigintdgst = BigInt(blindmessage)
       const llave = new RsaPrivKey(privateKey.d,privateKey.n)
-      console.log('firmado con llave: ',llave)
+      //console.log('firmado con llave: ',llave)
       const dgst = BigInt(bigintdgst)
-      const digstfirmado= llave.blindSign(dgst)
-      console.log('digstfirmado:',digstfirmado)
-      socket.emit('digstfirmado',digstfirmado.toString())
+      const SignedBlindMessage= llave.blindSign(dgst)
+      console.log('SignedBlindMessage:',SignedBlindMessage)
+      socket.emit('SignedBlindMessage',SignedBlindMessage.toString())
     })
+    
+    socket.on('sendDigest',(sendunblind)=>{
+
+    })
+
+
+
+
+
+
+
+
+
+
+
     /*socket.on('certificate',async (certificate)=>{
       console.log('---------------------')
       console.log('certificate')
@@ -225,9 +225,54 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('getMessage', firmaJson);
         
       });
+    })
       
-      
-      
-  });
+    /* 
+    //evento login
+    socket.on('login',(texto,stringllavepub)=>{
+      console.log('---------------------')
+      console.log('login')
+        //console.log('texto: ',texto)
+        //console.log('stringllavepub: ',stringllavepub)
+        // Generar un nonce aleatorio
+        //const nonceBytes = crypto.randomBytes(16);
+        //const nonce = nonceBytes.toString('hex');
+        const nonce = '1234567890'
+        //console.log('nonce: ', nonce)
+        // recuperar los string de la llave publica recibida, y pasarlos a bigint
+        const publicKey = JSON.parse(stringllavepub);
+        const e = BigInt(publicKey.e);
+        const n = BigInt(publicKey.n);
+        //console.log('llave e: ',e )
+        //console.log('n: ',n)
+        const llavePub = new RsaPubKey(e,n)// crear una llave publica del cliente con los valores recibidos
+        //console.log('llavePub: ',llavePub)
+        const encryptedNonce = llavePub.encrypt(BigInt(nonce))//encryptar el nonce con la llave publica del cliente
+        const encryptedNoncetoString = encryptedNonce.toString()
+        //console.log('encryptedNonce:',encryptedNonce)
+        socket.emit('login1', encryptedNoncetoString)//evento que emite al cliente el nonce encriptado
+        socket.on('desencryptedNonce', (desencryptedNonce) => {//evento que recibe el nonce desencriptado en el cliente, si es igual al enviado autentificación correcta
+          console.log('---------------------')
+          console.log('desencryptedNonce')
+            //console.log('Nonce desencriptado en el cliente:', desencryptedNonce);
+            if(desencryptedNonce === nonce){//si son iguales login correcto, llave publica del cliente verificada
+                //guardar en base datos
+                //decirle al cliente que todo okay
+                //console.log('nonce iguales, login okay')
+                const idcliente = cliente.guardarCliente(llavePub)//guardamos la llave del cliente para poder verificar sus mensajes firmados
+                //console.log('idcliente:',idcliente)
+                const respuesta = {
+                    mensaje: 'okay',
+                    clienteId: idcliente
+                  };
+                socket.emit('validochat',respuesta)//evento que comunica al cliente que el login es correcto
+            }
+            else{
+                console.log('nonce difrentes, mal login')
+                socket.emit('validochat','no')//evento que comunica al cliente que el login es incorrecto, no a podido desencriptar el nonce no es propietario de la llave publica recibida
+            }
+          });
+    })
+    */
 
   

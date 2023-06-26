@@ -20,6 +20,9 @@ export class ChatService {
     this.chatsLocal.push(message);
     this.socket.io.emit("sendMessage", message);
   }
+  SignUp(u:string,t:string){
+    this.socket.io.emit('Registro',u,t)
+  }
   login(u:string,p:string){
     this.socket.io.emit('login',u,p)
     this.socket.io.on('login1',(encryptedNoncetoString)=>{//la respuesa del servidor al intento del login es enviar un nonce encriptado con la publica que a recibido
@@ -65,8 +68,11 @@ export class ChatService {
    blindSign(bmString:string,r:bigint) {
     this.socket.io.emit('blindSign', bmString);
   }
-  sendDigest(digest:string){
-    this.socket.io.emit('sendDigest',digest)
+  blindmessage(digest:string){
+    this.socket.io.emit('blindmessage',digest)
+  }
+  sendunblind(unblind:string){
+    this.socket.io.emit('sendunblind',unblind)
   }
   sendCertificate(certificate: AnonymousCertificate){
   this.socket.io.emit('certificate', certificate);
