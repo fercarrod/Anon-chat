@@ -15,10 +15,14 @@ export class ChatComponent implements OnInit{
   text = ''
   isLoggedIn: boolean = false// se pondra en true cuando el login sea okay
   clienteId= ''
+  username=''
+  password=''
+  showLoginPopup: boolean = false;
   constructor(public chat:ChatService){
 
   }
   ngOnInit(): void {
+    this.showLoginPopup = true
     this.generateKeys()// para que la función que genera las llaves del cliente, se active nada mas activar el cliente
   }
     // Función que genera las llaves privada y pública del Cliente
@@ -96,7 +100,12 @@ export class ChatComponent implements OnInit{
 
       this.chat.sendMessage(mensajeEncriptadoConId);
     }
-  login() {//función para el evento login
+    onSignUp(){
+      if (this.username === 'usuario' && this.password === 'contraseña') {
+        this.isLoggedIn = true
+      }
+    }
+    onLoginSubmit() {//función para el evento login
     const username = 'validochat'; // Obtén el nombre de usuario del formulario
     const password = ''; // Obtén la contraseña del formulario
 

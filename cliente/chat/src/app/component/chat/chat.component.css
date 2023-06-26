@@ -1,3 +1,42 @@
+.login-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 20px;
+  border: 1px solid #ccc;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+}
+
+.login-popup h2 {
+  text-align: center;
+}
+
+.login-popup form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-popup label {
+  margin-bottom: 10px;
+}
+
+.login-popup input {
+  padding: 5px;
+  margin-bottom: 10px;
+}
+
+.login-popup .button-group {
+  display: flex;
+  justify-content: space-between;
+}
+
+.login-popup .signup-button {
+  display: flex;
+  justify-content: space-between;
+}
 .chatContainer{
   padding: 30px;
   width: 90%;
