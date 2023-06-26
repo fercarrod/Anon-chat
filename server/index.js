@@ -14,6 +14,7 @@ const io = require('socket.io')(http,{
     }
 })
 const { generateKeys, RsaPrivKey, RsaPubKey  } = require('./rsa');
+const clientes = require('./clientes');
 let serverChatKeyPair;// aqui se guardaran las llaves pública y privada del servidor. Si deseamos crear una enquesta anónima + generar un par de llaves para poder diferenciar si el cliente valida el chat o la enquesta
 
 const publicKey = new RsaPubKey(
@@ -62,10 +63,12 @@ io.on('connection', (socket) => {
   console.log('connection')
   console.log('Nueva conexión');
 
-    socket.on('Registro',(user,telefono)=>{
+    //evento para escuchar el emit del registro de un cliente
+    socket.on('Registro',(user,password,telefono)=>{
       console.log('user: ',user)
+      console.log('pw: ',password)
       console.log('tlf: ',telefono)
-      const result = cliente.saveUserData(user,telefono)// guardamos el cliente en el diccionario que funciona como base de datos 
+      const result = cliente.saveUserData(user,password,telefono,'false')// guardamos el cliente en el diccionario que funciona como base de datos 
       if (result.error) {
         console.log('Error:', result.error);
       } else if (result.success) {
@@ -73,7 +76,7 @@ io.on('connection', (socket) => {
       }
       socket.emit('RegistroResult',result)
       console.log('-------------------');
-      /*
+      
       //bucle para imprimir el diccionario de usuarios
       console.log('Datos de usuarios:');
       console.log('---------------------')
@@ -81,9 +84,24 @@ io.on('connection', (socket) => {
         const user = cliente.users[username];
         console.log('Username:', username);
         console.log('Teléfono:', user.telefono);
+        console.log('id anon?:',user.tieneIdAnonima)
         console.log('-------------------');
-      */
-      });
+      
+    });
+    //evento que recibe el mensaje blind(hash(pubCliente)) lo firma y se lo devuelve
+    socket.on('blindmessage',(blindmessage)=>{
+      console.log('---------------------')
+      console.log('blindmessage')
+      console.log('blindmessage recibido: ',blindmessage)
+      const bigintdgst = BigInt(blindmessage)
+      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      //console.log('firmado con llave: ',llave)
+      const dgst = BigInt(bigintdgst)
+      const SignedBlindMessage= llave.blindSign(dgst)
+      console.log('SignedBlindMessage:',SignedBlindMessage)
+      socket.emit('SignedBlindMessage',SignedBlindMessage.toString())
+    })
+    //evento para escuchar el emit del ConfirmaCerti de un cliente, comprobación de que se certificado es correcto
     socket.on('ConfirmaCerti',async (comprobar)=>{
       console.log('@')
       //console.log(comprobar)
@@ -98,138 +116,68 @@ io.on('connection', (socket) => {
       console.log('Llave:', llave);
       console.log('Signature:', Signature)
       console.log('-------------------');
-      //para la comprobación usar la llave para obtener un digest usando la función hash
-      //y verificar la Signature usando la llave publica del server y obtenemos otro digest
-      //si los digest1 y dgst2 son iguales certificado correcto, dar id anonima al tlf
-      const valorllave = JSON.parse(llave);
-      const e = valorllave.e;
-      const n = valorllave.n;
-      //console.log('Valor de e:', e);
-      //console.log('Valor de n:', n);
-      const publicKeyCliente = new RsaPubKey(BigInt(e),BigInt(n))
-      console.log(publicKeyCliente)
-      console.log('-------------------');
-      const data = objectSha.hashable(valorllave);//preparación de la llave publica para realizar el hash
-      const dgst1 = await objectSha.digest(data)// generamos el digest de la llave publica cliente, este es el valor que se usara para la comprobación
-      console.log('dgst:',dgst1)
-
-      const llavePUBServer= new RsaPubKey(publicKey.e,publicKey.n)
-      console.log('llavePUBServer:',llavePUBServer)
-      const verificarSign = llavePUBServer.verify(BigInt(Signature))
-      console.log('verificarSign:',verificarSign)
-      const dgst2 =bigintConversion.bigintToHex(verificarSign)
-      console.log('dgst:',dgst1)
-      console.log('dgst2:',dgst2)
-      if(dgst1===dgst2){
-        console.log('okay')
-      }else{
-        console.log('error en certi')
-      }
-    })
-    
-
-    socket.on('blindSign', (bmString) => {
-      console.log('---------------------')
-      console.log('blindSign')
-      console.log('bm recibido: ',bmString)
-      const blindedMessage = BigInt(bmString);
-      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
-      const blindSignature = llave.blindSign(blindedMessage)
-      console.log('blindSignature: ',blindSignature)
-      socket.emit('Signature', blindSignature.toString());
-    })
-
-
-    
-
-    socket.on('blindmessage',(blindmessage)=>{
-      console.log('---------------------')
-      console.log('blindmessage')
-      console.log('blindmessage recibido: ',blindmessage)
-      const bigintdgst = BigInt(blindmessage)
-      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
-      //console.log('firmado con llave: ',llave)
-      const dgst = BigInt(bigintdgst)
-      const SignedBlindMessage= llave.blindSign(dgst)
-      console.log('SignedBlindMessage:',SignedBlindMessage)
-      socket.emit('SignedBlindMessage',SignedBlindMessage.toString())
-    })
-    
-    socket.on('sendDigest',(sendunblind)=>{
-
-    })
-
-
-
-
-
-
-
-
-
-
-
-    /*socket.on('certificate',async (certificate)=>{
-      console.log('---------------------')
-      console.log('certificate')
-      //console.log('Certificate received:', certificate)
-      //console.log('Client Public Key:', certificate.clientPublicKey);
-      console.log('Signature:', certificate.serverSignature);
-      const data = objectSha.hashable(certificate.clientPublicKey); // Preparar el objeto para ser hashable
-      //console.log('@@@data:',data)
-      //console.log('objectSha:', objectSha.hashable(data));
-      try{
-      const digest1 = await objectSha.digest(data, 'SHA-512');
-      const signatureBigInt = BigInt(certificate.serverSignature)
-      console.log('digest1:', digest1);
-      console.log('signatureBigInt:',signatureBigInt)
-      const d2 = llaveS.verify(signatureBigInt)
-      console.log('d2:', d2);
-      const d1 = bigintConversion.hexToBigint(digest1)
-      
-      console.log('d1:',d1)
-      console.log('si salen a es diferente de b, hay algo que falla')
-      if(d1===d2){
-        console.log('son iguales')
-      }else{
-        console.log('no lo son')
-      }
-      }catch{console.log('error')}
-      
-    })*/
-    socket.on('certificate', async (certificate) => {
-      console.log('---------------------');
-      console.log('certificate');
-      console.log('Signature:', certificate.serverSignature);
-      //console.log('Client Public Key:', certificate.clientPublicKey);
-    
+      const valorllaveCliente = JSON.parse(llave)
+      const e= valorllaveCliente.e
+      const n = valorllaveCliente.n
+      const llavePUBServer = new RsaPubKey(publicKey.e,publicKey.n)
       try {
-        const publicKey = certificate.clientPublicKey;
-        const llaveS = new RsaPubKey(BigInt(publicKey.e), BigInt(publicKey.n));
-    
-        const data = objectSha.hashable(publicKey);
-        const digest = await objectSha.digest(data, 'SHA-512');
-    
-        console.log('Digest:', digest);
-        console.log('Signature:', BigInt(certificate.serverSignature));
-    
-        const dgst1 = llaveS.verify(BigInt(certificate.serverSignature));
-        const dgst2 = bigintConversion.hexToBigint(await objectSha.digest(digest, 'SHA-512'));
-
-        console.log('dgst1:', dgst1);
-        console.log('dgst2:', dgst2);
-        
-        if (dgst1 === dgst2) {
-          console.log('Signature is valid.');
-        } else {
-          console.log('Signature is not valid.');
-        }
-      } catch (error) {
-        console.log('Error:', error);
+        const resultado = await certificado.confirmarCertificado(llavePUBServer,valorllaveCliente, Signature);
+        console.log('resultado:', resultado);
+        if (resultado.success) {
+          console.log('certi okay');
+          // Acceder al objeto 'users' del módulo cliente
+          const tieneIdAnonima = true
+          const update = clientes.updateTieneIdAnonimaByTelefono(telefono,tieneIdAnonima)
+          console.log(update);
+          } else if (resultado.error) {
+          console.log('certi invalido')
+      
+        socket.emit('ConfirmaCertiResult',resultado)
+        // Realiza cualquier lógica adicional que necesites con los datos del mensaje
+      }} catch (error) {
+        console.error('Error al confirmar el certificado:', error);
+        // Realiza acciones adicionales en caso de error
       }
-    });
-    
-  
+    })
+    /**
+     *     socket.on('ConfirmaCerti',async (comprobar)=>{
+      console.log('@')
+      //console.log(comprobar)
+      // Obtener los valores individuales
+      const telefono = comprobar.telefono;
+      const id = comprobar.id;
+      const llave = comprobar.llave;
+      const Signature = comprobar.Signature;
+      console.log('-------------------');
+      console.log('Telefono:', telefono);
+      console.log('ID:', id);
+      console.log('Llave:', llave);
+      console.log('Signature:', Signature)
+      console.log('-------------------');
+      const valorllaveCliente = JSON.parse(llave)
+      const e= valorllaveCliente.e
+      const n = valorllaveCliente.n
+      const llavePUBServer = new RsaPubKey(publicKey.e,publicKey.n)
+      try {
+        const resultado = await certificado.confirmarCertificado(llavePUBServer,valorllaveCliente, Signature);
+        console.log('resultado:', resultado);
+        if (resultado.success) {
+          console.log('certi okay');
+          // Acceder al objeto 'users' del módulo cliente
+          const tieneIdAnonima = true
+          const update = clientes.updateTieneIdAnonimaByTelefono(telefono,tieneIdAnonima)
+          console.log(update);
+          } else if (resultado.error) {
+          console.log('certi invalido')
+      
+        socket.emit('ConfirmaCertiResult',resultado)
+        // Realiza cualquier lógica adicional que necesites con los datos del mensaje
+      }} catch (error) {
+        console.error('Error al confirmar el certificado:', error);
+        // Realiza acciones adicionales en caso de error
+      }
+    })
+     */
     
     //evento recibir mensaje y hacer broadcast a todos los clientes
     socket.on('sendMessage', async (message) => {
@@ -286,8 +234,53 @@ io.on('connection', (socket) => {
     });
     
   })
+})
       
+
+
+
+
+  //pruebas de código, funciones antiguas etc
     /* 
+   socket.on('certificate', async (certificate) => {
+      console.log('---------------------');
+      console.log('certificate');
+      console.log('Signature:', certificate.serverSignature);
+      //console.log('Client Public Key:', certificate.clientPublicKey);
+    
+      try {
+        const publicKey = certificate.clientPublicKey;
+        const llaveS = new RsaPubKey(BigInt(publicKey.e), BigInt(publicKey.n));
+    
+        const data = objectSha.hashable(publicKey);
+        const digest = await objectSha.digest(data, 'SHA-512');
+    
+        console.log('Digest:', digest);
+        console.log('Signature:', BigInt(certificate.serverSignature));
+    
+        const dgst1 = llaveS.verify(BigInt(certificate.serverSignature));
+        const dgst2 = bigintConversion.hexToBigint(await objectSha.digest(digest, 'SHA-512'));
+
+        console.log('dgst1:', dgst1);
+        console.log('dgst2:', dgst2);
+        
+        if (dgst1 === dgst2) {
+          console.log('Signature is valid.');
+        } else {
+          console.log('Signature is not valid.');
+        }
+      } catch (error) {
+        console.log('Error:', error);
+      }
+    });
+    
+
+
+
+
+
+
+
     //evento login
     socket.on('login',(texto,stringllavepub)=>{
       console.log('---------------------')
@@ -334,5 +327,109 @@ io.on('connection', (socket) => {
           });
     })
     */
+   /**
+    *   socket.on('ConfirmaCerti',async (comprobar)=>{
+      console.log('@')
+      //console.log(comprobar)
+      // Obtener los valores individuales
+      const telefono = comprobar.telefono;
+      const id = comprobar.id;
+      const llave = comprobar.llave;
+      const Signature = comprobar.Signature;
+      console.log('-------------------');
+      console.log('Telefono:', telefono);
+      console.log('ID:', id);
+      console.log('Llave:', llave);
+      console.log('Signature:', Signature)
+      console.log('-------------------');
+     /*
+      //para la comprobación usar la llave para obtener un digest usando la función hash
+      //y verificar la Signature usando la llave publica del server y obtenemos otro digest
+      //si los digest1 y dgst2 son iguales certificado correcto, dar id anonima al tlf
+      const valorllave = JSON.parse(llave);
+      const e = valorllave.e;
+      const n = valorllave.n;
+      //console.log('Valor de e:', e);
+      //console.log('Valor de n:', n);
+      const publicKeyCliente = new RsaPubKey(BigInt(e),BigInt(n))
+      console.log(publicKeyCliente)
+      console.log('-------------------');
+      const data = objectSha.hashable(valorllave);//preparación de la llave publica para realizar el hash
+      const dgst1 = await objectSha.digest(data)// generamos el digest de la llave publica cliente, este es el valor que se usara para la comprobación
+      console.log('dgst:',dgst1)
 
+      const llavePUBServer= new RsaPubKey(publicKey.e,publicKey.n)
+      console.log('llavePUBServer:',llavePUBServer)
+      const verificarSign = llavePUBServer.verify(BigInt(Signature))
+      console.log('verificarSign:',verificarSign)
+      const dgst2 =bigintConversion.bigintToHex(verificarSign)
+      console.log('dgst:',dgst1)
+      console.log('dgst2:',dgst2)
+      if(dgst1===dgst2){
+        console.log('okay')
+        socket.emit('ConfirmaCertiResult', 'succes')
+      }else{
+        console.log('error en certi')
+        socket.emit('ConfirmaCertiResult', 'error')
+      }*/
+    /**
+     *     socket.on('blindSign', (bmString) => {
+      console.log('---------------------')
+      console.log('blindSign')
+      console.log('bm recibido: ',bmString)
+      const blindedMessage = BigInt(bmString);
+      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      const blindSignature = llave.blindSign(blindedMessage)
+      console.log('blindSignature: ',blindSignature)
+      socket.emit('Signature', blindSignature.toString());
+    })
+
+
+    
+
+    socket.on('blindmessage',(blindmessage)=>{
+      console.log('---------------------')
+      console.log('blindmessage')
+      console.log('blindmessage recibido: ',blindmessage)
+      const bigintdgst = BigInt(blindmessage)
+      const llave = new RsaPrivKey(privateKey.d,privateKey.n)
+      //console.log('firmado con llave: ',llave)
+      const dgst = BigInt(bigintdgst)
+      const SignedBlindMessage= llave.blindSign(dgst)
+      console.log('SignedBlindMessage:',SignedBlindMessage)
+      socket.emit('SignedBlindMessage',SignedBlindMessage.toString())
+    })
+    
+    socket.on('sendDigest',(sendunblind)=>{
+
+    })
+     */
+    /*socket.on('certificate',async (certificate)=>{
+      console.log('---------------------')
+      console.log('certificate')
+      //console.log('Certificate received:', certificate)
+      //console.log('Client Public Key:', certificate.clientPublicKey);
+      console.log('Signature:', certificate.serverSignature);
+      const data = objectSha.hashable(certificate.clientPublicKey); // Preparar el objeto para ser hashable
+      //console.log('@@@data:',data)
+      //console.log('objectSha:', objectSha.hashable(data));
+      try{
+      const digest1 = await objectSha.digest(data, 'SHA-512');
+      const signatureBigInt = BigInt(certificate.serverSignature)
+      console.log('digest1:', digest1);
+      console.log('signatureBigInt:',signatureBigInt)
+      const d2 = llaveS.verify(signatureBigInt)
+      console.log('d2:', d2);
+      const d1 = bigintConversion.hexToBigint(digest1)
+      
+      console.log('d1:',d1)
+      console.log('si salen a es diferente de b, hay algo que falla')
+      if(d1===d2){
+        console.log('son iguales')
+      }else{
+        console.log('no lo son')
+      }
+      }catch{console.log('error')}
+      
+    })*/
   

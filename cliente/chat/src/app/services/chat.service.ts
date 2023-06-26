@@ -14,6 +14,17 @@ export class ChatService {
   constructor(public socket:SocketService) {
     this.getMessage()//cuando se inicia se queda esuchando para recibir msj
   }
+  //evento para registarse en el servidor
+  SignUp(u:string,p:string,t:string){
+    this.socket.io.emit('Registro',u,p,t)
+  }
+  blindmessage(digest:string){
+    this.socket.io.emit('blindmessage',digest)
+  }
+  //evento para obtener confirmación del certificado
+  ConfirmaCerti(comprobar: { telefono: string; id: string; llave: string; Signature: string }){
+    this.socket.io.emit('ConfirmaCerti',comprobar)
+  }
   //evento para enviar los mensajes al server
   sendMessage(chatlocal:string, mensajeEncriptado: string, clienteId: string, llave: string, signature: string) {
     const message = {
@@ -26,13 +37,25 @@ export class ChatService {
     this.socket.io.emit("sendMessage", message);
   }
 
-  SignUp(u:string,t:string){
-    this.socket.io.emit('Registro',u,t)
+
+
+
+  //evento para recibir los mensajes del server
+  getMessage(){
+    this.socket.io.on("getMessage",(message)=>{
+      console.log("el server a enviado el msg:",message)
+      const msgVerificado = this.publicKeyServer.verify(BigInt(message))
+      const msgVerificadotoString = bigintconversion.bigintToText(msgVerificado)
+      console.log('msgVerificadotoString: ',msgVerificadotoString)
+      this.chatsServer.push(msgVerificadotoString)
+    })
   }
-  ConfirmaCerti(comprobar: { telefono: string; id: string; llave: string; Signature: string }){
-    this.socket.io.emit('ConfirmaCerti',comprobar)
+  getChats(): { }[] {
+    return this.chatsLocal;
   }
-  login(u:string,p:string){
+  /*
+
+   login(u:string,p:string){
     this.socket.io.emit('login',u,p)
     this.socket.io.on('login1',(encryptedNoncetoString)=>{//la respuesa del servidor al intento del login es enviar un nonce encriptado con la publica que a recibido
       console.log('encryptedNonce: ',encryptedNoncetoString)
@@ -55,31 +78,19 @@ export class ChatService {
       } else { console.log('La clave privada no se encontró en el Local Storage.');}
     })
   }
-  //evento para recibir los mensajes del server
-  getMessage(){
-    this.socket.io.on("getMessage",(message)=>{
-      console.log("el server a enviado el msg:",message)
-      const msgVerificado = this.publicKeyServer.verify(BigInt(message))
-      const msgVerificadotoString = bigintconversion.bigintToText(msgVerificado)
-      console.log('msgVerificadotoString: ',msgVerificadotoString)
-      this.chatsServer.push(msgVerificadotoString)
-    })
-  }
-  getChats(): { }[] {
-    return this.chatsLocal;
-  }
   blindSign(bmString:string,r:bigint) {
     this.socket.io.emit('blindSign', bmString);
   }
-  blindmessage(digest:string){
-    this.socket.io.emit('blindmessage',digest)
-  }
   sendunblind(unblind:string){
     this.socket.io.emit('sendunblind',unblind)
-  }
-  sendCertificate(certificate: AnonymousCertificate){
+  }*/
+
+  /*sendCertificate(certificate: AnonymousCertificate){
   this.socket.io.emit('certificate', certificate);
-  }
+  }*/
+
+
+
   publicKeyServer = new RsaPubKey(
     65537n,
     175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n

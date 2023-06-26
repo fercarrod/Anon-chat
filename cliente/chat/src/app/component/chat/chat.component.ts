@@ -16,6 +16,7 @@ export class ChatComponent implements OnInit{
   isLoggedIn: boolean = false// se pondra en true cuando el login sea okay
   //datos del cliente para registar con el servidor
   username=''
+  password=''
   telefono=''//uso el telefono como valor único, como si fuera una votación y necesita pedir el permiso para votar usando el dni
   //variables para mostrar respuesta signup
   successMessage: string | null = null;
@@ -25,14 +26,15 @@ export class ChatComponent implements OnInit{
   certificadoCreado: boolean = false;
   clienteId= ''
   constructor(public chat:ChatService){
-
   }
+
   ngOnInit(): void {
-    this.isLoggedIn = true//quitar para que fufe el login
-    this.certificadoCreado = true
+    this.isLoggedIn = false//quitar para que fufe el login
+    this.certificadoCreado = false
     this.generateKeys()// para que la función que genera las llaves del cliente, se active nada mas activar el cliente
   }
-    // Función que genera las llaves privada y pública del Cliente
+
+  // Función que genera las llaves privada y pública del Cliente
   generateKeys() {
     generatekeys(1024).then((keys: RsaKeyPair) => {
         console.log('Claves generadas:', keys);
@@ -56,17 +58,119 @@ export class ChatComponent implements OnInit{
         console.error('Error al generar las claves:', error);
       });
     }
-    generateRandomBigInt(): bigint {
-      const array = new Uint8Array(32);
-      window.crypto.getRandomValues(array);
-      const hexString = Array.from(array)
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-      return BigInt('0x' + hexString);
+
+    //evento para Registrarnos en el servidor
+    onSignUp(){
+      //obtenemos los valores escritos en el navegador
+      const username = this.username
+      const password = this.password
+      const tlf = this.telefono
+
+      this.chat.SignUp(username,password,tlf)//usamos el service del chat para mandar lo datos al servidor
+      //evento para esuchar la respuesta del registro, si es succes o error
+      this.chat.socket.io.on('RegistroResult',(respuesta)=>{
+        console.log('res:',respuesta)
+        if(respuesta.success){
+          console.log('Registro Completo')
+          this.successMessage = 'Registro completo.';
+          this.isLoggedIn= true;
+        }
+        if(respuesta.error){
+          console.log('error')
+          this.errorMessage = respuesta.error;
+          //el isloggedin se mantiene en false
+        }
+      })
     }
 
+    //falta enviar las llave publica del servidor cuando el registro es okay, de momento uso una estatica en el server y cliente
+    publicKeyServer = new RsaPubKey(
+      65537n,
+      175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
+    );
 
-    sendMessage() {
+  //si el registro es okay, creamos el certificado anónimo
+  async CrearCertificado() {
+    try {
+        //recuperamos llave publica del cliente del localstorage del navegador
+        const publicKeyJson = localStorage.getItem('publicKey');
+        if (publicKeyJson === null) {
+          console.error('No se encontró la llave pública en localStorage.');
+          return;
+        }
+
+        const publicKey = JSON.parse(publicKeyJson);//guardamos la llave publica del cliente
+        const llavePUBServer = new RsaPubKey(this.publicKeyServer.e,this.publicKeyServer.n) //llave publica servidor
+        //const llavePRIVServer = new RsaPrivKey(this.privateKeyServer.d,this.privateKeyServer.n);//llave privada servidor
+
+        console.log('---------------------------');
+        console.log('##Hash a esta llaveCliente:', publicKey);
+        console.log('@@@llavePUBServer:', llavePUBServer);
+        //console.log('@@@llavePRIVServer:', llavePRIVServer);
+        console.log('---------------------------');
+
+        //generamos un numero de cegado r
+        const r = bcu.randBetween(llavePUBServer.n, llavePUBServer.n / 2n);
+        //console.log('@@@r:', r)
+
+
+        const data = objectSha.hashable(publicKey);//preparación de la llave publica para realizar el hash
+        const dgst = await objectSha.digest(data)// generamos el digest de la llave publica cliente, este es el valor que se usara para la comprobación
+        const digstbig =bigintconversion.hexToBigint(dgst)// transformamos el valor en bigint
+        //console.log('data1:', data)
+        console.log('##dgst1:', dgst);
+        //console.log('digstbig1:', digstbig);
+        console.log('---------------------------');
+
+        const blindmessage = llavePUBServer.blindMessage(digstbig,r)//cegamos el digest usando la llave publica del server y el valor de cegado r
+        console.log('##blindmessage que se envia:', blindmessage)
+        console.log('---------------------------');
+        this.chat.blindmessage(blindmessage.toString());
+
+        this.chat.socket.io.on('SignedBlindMessage', (digstfirmado) => {// aqui recibimos la firma que hace el servidor al blindmessage que le hemos enviado
+          console.log('digstfirmado reciibido: ',digstfirmado)
+          const unblind = llavePUBServer.unblindSign(BigInt(digstfirmado),r)//descegamos el mensaje recibido del servidor para obtener su firma
+          console.log('unblind:', unblind)// en unblind, tenemos la firma del servidor para generar el certificado
+
+          const certificate: AnonymousCertificate = {//generamos el certificado usando el servicio certificate.service.ts
+            chatId: "valido chat anon",//validación para el chat
+            clientPublicKey: publicKey,//llave publica del cliente
+            serverSignature: unblind.toString(), // Utiliza el valor desblindado como la firma del servidor
+          };
+          console.log('certificate:',certificate)
+          localStorage.setItem('certificate', JSON.stringify(certificate))//guardamos el certificado en el localstorage del navegador
+          this.certificadoCreado = true;//ponemos el boolean en true
+          const telefono = this.telefono
+          //enviamos telefono + certificado para que el servidor compruebe el certificado y nos de la id anonima
+          const comprobar = {
+            telefono: telefono,
+            id: certificate.chatId,
+            llave: JSON.stringify(certificate.clientPublicKey),
+            Signature: certificate.serverSignature
+          };
+          console.log('comprobar',comprobar)
+          this.chat.ConfirmaCerti(comprobar)
+          this.chat.socket.io.on('ConfirmaCertiResult',(respuesta)=>{
+            console.log(respuesta)
+            if(respuesta.success){
+              console.log('ConfirmaCertiResult Completo')
+              this.certificadoCreado = true
+            }
+            if(respuesta.error){
+              console.log('error')
+              this.errorMessage = respuesta.error;
+              //el isloggedin se mantiene en false
+            }
+            this.certificadoCreado = true
+          })
+
+      })
+
+    }catch{console.log('error')}
+  }
+
+  //evento para enviar mensajes al servidor
+  sendMessage() {
       const message = this.text; // Guardar el texto introducido en el navegador en la variable "message"
       console.log('El mensaje a Encriptar:', message);
       // Recuperar la llave pública del servidor
@@ -110,103 +214,18 @@ export class ChatComponent implements OnInit{
       }
       this.chat.sendMessage(message,mensajeEncriptado.toString(), chatId, JSON.stringify(clientPublicKey), serverSignature);
     }
-
-    onSignUp(){
-      //obtenemos los valores escritos en el navegador
-      const username =this.username
-      const tlf = this.telefono
-
-      this.chat.SignUp(username,tlf)//usamos el service del chat para mandar lo datos al servidor
-      this.chat.socket.io.on('RegistroResult',(respuesta)=>{
-        console.log('res:',respuesta)
-        if(respuesta.success){
-          console.log('Registro Completo')
-          this.successMessage = 'Registro completo.';
-          this.isLoggedIn= true;
-        }
-        if(respuesta.error){
-          console.log('error')
-          this.errorMessage = respuesta.error;
-          //el isloggedin se mantiene en false
-        }
-      })
-    }
+  }
 
 
 
-  publicKeyServer = new RsaPubKey(
-    65537n,
-    175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
-  );
-
-  privateKeyServer = new RsaPrivKey(
-    75456502557277026526123377493375928645869721466418857599026975315043129364972918622201370411246055316591215591360005523996356649683786414767407947704394647567284725479192980459321523657123422907946853497023907676171905762287798267845031556025361484222596514903007650599789214986162426285218570158514041859233n,
-    175386324588461643050168385259731104967526029782405045767748293418285628074628676682622046128593868892163374103098336006034516447379993980160718352557203607108599876654408716296392552079898399252848125479796687885372909069452604039695399417243339751888547531648338585597326693177892256645266422230991237372399n
-  );
-  async CrearCertificado() {
-    try {
-      //recuperamos llave publica del cliente del localstorage del navegador
-      const publicKeyJson = localStorage.getItem('publicKey');
-      if (publicKeyJson === null) {
-        console.error('No se encontró la llave pública en localStorage.');
-        return;
-      }
-
-      const publicKey = JSON.parse(publicKeyJson);//guardamos la llave publica del cliente
-      const llavePUBServer = new RsaPubKey(this.publicKeyServer.e,this.publicKeyServer.n) //llave publica servidor
-      const llavePRIVServer = new RsaPrivKey(this.privateKeyServer.d,this.privateKeyServer.n);//llave privada servidor
-
-      console.log('---------------------------');
-      console.log('##Hash a esta llaveCliente:', publicKey);
-      console.log('@@@llavePUBServer:', llavePUBServer);
-      console.log('@@@llavePRIVServer:', llavePRIVServer);
-      console.log('---------------------------');
-
-      //generamos un numero de cegado r
-      const r = bcu.randBetween(llavePUBServer.n, llavePUBServer.n / 2n);
-      //console.log('@@@r:', r)
 
 
-      const data = objectSha.hashable(publicKey);//preparación de la llave publica para realizar el hash
-      const dgst = await objectSha.digest(data)// generamos el digest de la llave publica cliente, este es el valor que se usara para la comprobación
-      const digstbig =bigintconversion.hexToBigint(dgst)// transformamos el valor en bigint
-      //console.log('data1:', data)
-      console.log('##dgst1:', dgst);
-      //console.log('digstbig1:', digstbig);
-      console.log('---------------------------');
 
-      const blindmessage = llavePUBServer.blindMessage(digstbig,r)//cegamos el digest usando la llave publica del server y el valor de cegado r
-      console.log('##blindmessage que se envia:', blindmessage)
-      console.log('---------------------------');
-      this.chat.blindmessage(blindmessage.toString());
 
-      this.chat.socket.io.on('SignedBlindMessage', (digstfirmado) => {// aqui recibimos la firma que hace el servidor al blindmessage que le hemos enviado
-        console.log('digstfirmado reciibido: ',digstfirmado)
-        const unblind = llavePUBServer.unblindSign(BigInt(digstfirmado),r)//descegamos el mensaje recibido del servidor para obtener su firma
-        console.log('unblind:', unblind)// en unblind, tenemos la firma del servidor para generar el certificado
 
-        const certificate: AnonymousCertificate = {//generamos el certificado usando el servicio certificate.service.ts
-          chatId: "valido chat anon",//validación para el chat
-          clientPublicKey: publicKey,//llave publica del cliente
-          serverSignature: unblind.toString(), // Utiliza el valor desblindado como la firma del servidor
-        };
-        console.log('certificate:',certificate)
-        localStorage.setItem('certificate', JSON.stringify(certificate))//guardamos el certificado en el localstorage del navegador
-        this.certificadoCreado = true;//ponemos el boolean en true
-        const telefono = this.telefono
-        //enviamos telefono + certificado para que el servidor compruebe el certificado y nos de la id anonima
-        const comprobar = {
-          telefono: telefono,
-          id: certificate.chatId,
-          llave: JSON.stringify(certificate.clientPublicKey),
-          Signature: certificate.serverSignature
-        };
-        console.log('comprobar',comprobar)
-        this.chat.ConfirmaCerti(comprobar)
-    })
 
-  }catch{console.log('error')}
-}}
+
+  ///intentos de funciones, no terminan de funcionar arreglar
 
   /*async test() {
     // Recuperamos el string de la llave del local storage
