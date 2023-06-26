@@ -18,6 +18,11 @@ export class ChatService {
   SignUp(u:string,p:string,t:string){
     this.socket.io.emit('Registro',u,p,t)
   }
+  Login(u:string,p:string,t:string){
+    console.log('service')
+    this.socket.io.emit('holalogin',u,p,t)
+  }
+
   blindmessage(digest:string){
     this.socket.io.emit('blindmessage',digest)
   }

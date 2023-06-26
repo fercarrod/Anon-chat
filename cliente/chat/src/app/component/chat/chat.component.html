@@ -12,6 +12,7 @@
       <!-- Botones -->
       <div class="button-group">
         <!--<button type="submit" class="login-button">Iniciar sesión</button>-->
+        <button type="button" class="login-button" (click)="onLogin()">Iniciar sesión</button>
         <button type="button" class="signup-button" (click)="onSignUp()">Registrarse</button>
       </div>
     </form>
@@ -30,6 +31,7 @@
 <div *ngIf="isLoggedIn" class="app-container">
 
   <button (click)="CrearCertificado()">Crear Certificado</button>
+  <button type="button" class="login-button" (click)="onLogin()">Iniciar sesión</button>
 <!-- Sección de chatContainer -->
 <div *ngIf="certificadoCreado" class="chatContainer">
   <p class="local" *ngFor="let chat of chat.chatsLocal">{{ chat }}</p>

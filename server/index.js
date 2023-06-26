@@ -83,11 +83,28 @@ io.on('connection', (socket) => {
       Object.keys(cliente.users).forEach(username => {
         const user = cliente.users[username];
         console.log('Username:', username);
+        console.log('pw:',user.password)
         console.log('Teléfono:', user.telefono);
         console.log('id anon?:',user.tieneIdAnonima)
         console.log('-------------------');
       
     });
+    socket.on('test',(datos)=>{
+      console.log('test')
+    })
+    socket.on('holalogin', (user, password, telefono) => {
+      console.log('user:', user);
+      console.log('pw:', password);
+      console.log('tlf:', telefono);
+      const existeUsuario = clientes.getUserByCredentials(user, password, telefono);
+      if (existeUsuario.success) {
+        console.log('usario existe login okay');
+      } else {
+        console.log('usario no existe login incorrecto');
+      }
+      socket.emit('LoginResult', existeUsuario);
+    });
+    
     //evento que recibe el mensaje blind(hash(pubCliente)) lo firma y se lo devuelve
     socket.on('blindmessage',(blindmessage)=>{
       console.log('---------------------')

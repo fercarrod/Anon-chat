@@ -82,6 +82,26 @@ export class ChatComponent implements OnInit{
         }
       })
     }
+    onLogin(){
+
+      console.log('holalogin')
+      const username = this.username
+      const password = this.password
+      const tlf = this.telefono
+      this.chat.Login(username,password,tlf)
+      this.chat.socket.io.on('LoginResult',(respuesta)=>{
+        if(respuesta.success){
+          console.log('LoginResult Completo')
+          this.successMessage = 'LoginResult completo.';
+          this.isLoggedIn= true;
+        }
+        if(respuesta.error){
+          console.log('LoginResult error')
+          this.errorMessage = respuesta.error;
+          //el isloggedin se mantiene en false
+        }
+      })
+    }
 
     //falta enviar las llave publica del servidor cuando el registro es okay, de momento uso una estatica en el server y cliente
     publicKeyServer = new RsaPubKey(
